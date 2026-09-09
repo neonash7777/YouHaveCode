@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "package": "youhavecode",
   "version": "0.0.1",
-  "generatedAt": "2026-09-09T07:17:03.464Z",
+  "generatedAt": "2026-09-09T07:20:03.795Z",
   "algorithm": "sha256",
   "dataProvenance": {
     "unicode": {
@@ -88,8 +88,8 @@
     },
     {
       "path": "package.json",
-      "bytes": 34932,
-      "sha256": "864841d8ea18e860a561e2f33141aed82520633d468ebef056dd0e99398b4dd1"
+      "bytes": 34960,
+      "sha256": "df41ca5b1a25261921dcf6d37514cd6e7a0137aa150bafb91377c412357ecdf7"
     },
     {
       "path": "scripts/release-integrity.mjs",

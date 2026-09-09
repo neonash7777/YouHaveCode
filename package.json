@@ -1,6 +1,7 @@
 {
   "name": "youhavecode",
   "displayName": "YouHaveCode",
+  "publisher": "BrockNash",
   "description": "Need a Unicode symbol‽ Now you have the code‼",
   "icon": "resources/icon.png",
   "version": "0.0.1",
