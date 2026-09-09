@@ -1,0 +1,64 @@
+name: Build platform VSIX
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Package ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: win32-x64
+          - os: ubuntu-latest
+            target: linux-x64
+          - os: macos-15-intel
+            target: darwin-x64
+    runs-on: ${{ matrix.os }}
+    env:
+      TARGET: ${{ matrix.target }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and verify release inputs
+        run: npm run release:prepare
+
+      - name: Set artifact name
+        shell: bash
+        run: echo "VSIX=YouHaveCode-$(node -p "require('./package.json').version")-${TARGET}.vsix" >> "$GITHUB_ENV"
+
+      - name: Package target VSIX
+        shell: bash
+        run: npx --yes @vscode/vsce@3.9.2 package --target "$TARGET" --out "$VSIX"
+
+      - name: Generate checksum
+        shell: bash
+        run: npm run integrity:artifact -- "./$VSIX"
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: YouHaveCode-${{ matrix.target }}
+          path: |
+            YouHaveCode-*.vsix
+            YouHaveCode-*.vsix.sha256
+          if-no-files-found: error
