@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "package": "youhavecode",
+  "version": "0.0.1",
+  "generatedAt": "2026-09-09T07:00:25.345Z",
+  "algorithm": "sha256",
+  "dataProvenance": {
+    "unicode": {
+      "license": "Unicode License v3",
+      "notice": "THIRD_PARTY_NOTICES.md"
+    },
+    "emoji": {
+      "version": "17.0",
+      "source": "https://www.unicode.org/Public/emoji/17.0/emoji-test.txt",
+      "license": "Unicode License v3"
+    }
+  },
+  "files": [
+    {
+      "path": "CHANGELOG.md",
+      "bytes": 3283,
+      "sha256": "5666d319ac2bd7d358bec8e0a113e73f9d087c58aaa7127c6ef5af1dd2cfb432"
+    },
+    {
+      "path": "COMPATIBILITY_COVERAGE.md",
+      "bytes": 3672,
+      "sha256": "3d6156f8690ece8847e7399d31ed100cf2e28a970334a7fffa05a83db8272568"
+    },
+    {
+      "path": "DELEGATE_SECURITY.md",
+      "bytes": 1869,
+      "sha256": "1ef405825a3dca6c236fe7b8ddf48f60796a55eab79189522c947fa232bdbed7"
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 2132,
+      "sha256": "219429c29db725c608a2c4970f15318b0e2cc0493ea953663120c26ec30c45db"
+    },
+    {
+      "path": "README.md",
+      "bytes": 27242,
+      "sha256": "aa400f764d4b5ff1647675c73e01b7c4b67b83352f6f27611da323207b24d302"
+    },
+    {
+      "path": "RELEASE_CHECKLIST.md",
+      "bytes": 3521,
+      "sha256": "7ee54614ead89bd2dbfafe1821c3364627a1f0ba737dd3711acc216280dec1cf"
+    },
+    {
+      "path": "THIRD_PARTY_NOTICES.md",
+      "bytes": 4371,
+      "sha256": "b0a8a732c1a7e4a833a9b8e4787bde3444b1a259fb821e159b76a0b34decea68"
+    },
+    {
+      "path": "data/compatibility_profiles.json",
+      "bytes": 5327,
+      "sha256": "c6b2896128684824eeba682b2f0d8600e83cea57636fb1eaec7e286e22cf5bc1"
+    },
+    {
+      "path": "data/emoji_rgi.tsv",
+      "bytes": 363130,
+      "sha256": "241400c9da0914d7c1b8de8e13c228def99fd7d772bad9bd0dcef04781b4fd3f"
+    },
+    {
+      "path": "data/unicode_compact.csv",
+      "bytes": 3704482,
+      "sha256": "f990fde10a2727688b9359c7eefe29f01cceda4c1a90499c3fdfee3a7792d8f7"
+    },
+    {
+      "path": "data/unicode_property_aliases.csv",
+      "bytes": 3167,
+      "sha256": "b2acb4d933ca2f128e358370624dde0e2d87484d9fe19179eee111d6cd3ce91c"
+    },
+    {
+      "path": "dist/extension.js",
+      "bytes": 168546,
+      "sha256": "c6f20e247066b5fc74f0c5a0e80c88358103f6a0638f73162dab179eb958d90f"
+    },
+    {
+      "path": "node_modules/@napi-rs/canvas-darwin-arm64/skia.darwin-arm64.node",
+      "bytes": 27107936,
+      "sha256": "5f5cc59009b800f9507f33862b742033529219107e8fd8ddfb9fbdfade4eba1f"
+    },
+    {
+      "path": "package-lock.json",
+      "bytes": 205964,
+      "sha256": "17fca6e7800516a008c7a51bff8205e897def6da4a109a91a121c458ffcd223b"
+    },
+    {
+      "path": "package.json",
+      "bytes": 34830,
+      "sha256": "e60f12c8b6dfa24659bb578441e9a6536fb72de80b6ed2999e1fc2c798b819f8"
+    },
+    {
+      "path": "scripts/release-integrity.mjs",
+      "bytes": 3354,
+      "sha256": "76ca828853ff09021fd1f2c4f085bdfbb950702a6de110e38ba54f5860f9c721"
+    }
+  ]
+}

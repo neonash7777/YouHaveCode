@@ -1,0 +1,41 @@
+# YouHaveCode Extension License
+
+Copyright (c) 2026 Brock Nash. All rights reserved.
+
+Subject to the terms below, you are granted a limited, non-exclusive,
+non-transferable, revocable license to install and use unmodified copies of the
+YouHaveCode Visual Studio Code extension for personal, educational, or internal
+business purposes.
+
+You may use, copy, and distribute text, Unicode characters, emoji, code-point
+references, bitmap text art, and other output that you create with the extension
+without paying royalties to the copyright holder. This license does not claim
+ownership of your editor content or generated output.
+
+You may not copy, modify, distribute, sublicense, sell, rent, lease, host as a
+service, or create derivative works from the extension or its source code except
+with prior written permission from the copyright holder or where applicable law
+expressly permits the activity notwithstanding this restriction. You may not
+remove or alter copyright, license, attribution, or proprietary notices.
+
+If the extension source code is published or made visible in a repository,
+that availability does not grant any license beyond the rights expressly stated
+here.
+
+This license does not grant rights to any name, logo, or trademark associated
+with YouHaveCode. All rights not expressly granted are reserved.
+
+Third-party software and data included with the extension remain subject to
+their respective licenses and notices in THIRD_PARTY_NOTICES.md. Those licenses
+control in the event of a conflict concerning the applicable third-party
+material.
+
+THE EXTENSION IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT. TO THE MAXIMUM EXTENT
+PERMITTED BY LAW, THE COPYRIGHT HOLDER WILL NOT BE LIABLE FOR ANY CLAIM, DAMAGES,
+OR OTHER LIABILITY ARISING FROM OR RELATED TO THE EXTENSION OR ITS USE.
+
+This license terminates automatically if you materially breach its terms. Upon
+termination, you must stop using and delete all copies of the extension in your
+possession or control.

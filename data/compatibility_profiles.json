@@ -1,0 +1,169 @@
+{
+  "schemaVersion": 1,
+  "scope": "Platform system-font Unicode cmap coverage. Generic fallback fonts such as Last Resort count by default because the platform renders a glyph for those code points.",
+  "sources": [
+    {
+      "name": "Unicode DerivedAge.txt",
+      "url": "https://www.unicode.org/Public/UCD/latest/ucd/DerivedAge.txt",
+      "coverage": "Code point age ranges by Unicode version. Planned input for scalar Unicode coverage."
+    },
+    {
+      "name": "Unicode emoji-test.txt",
+      "url": "https://www.unicode.org/Public/emoji/latest/emoji-test.txt",
+      "coverage": "RGI emoji sequences and emoji version labels. The extension ships a compact export as emoji_rgi.tsv."
+    },
+    {
+      "name": "Microsoft Windows font lists",
+      "url": "https://learn.microsoft.com/en-us/typography/fonts/windows_11_font_list",
+      "coverage": "Published Windows font file inventory. Use it to verify expected system font files, then scan C:\\Windows\\Fonts from a pinned Windows install for cmap ranges."
+    },
+    {
+      "name": "Android system font inventory APIs and AOSP font configuration",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/refs/heads/main/data/fonts/fonts.xml",
+      "coverage": "AOSP font configuration and Android guidance. Use emulator/system-image font files or Android SystemFonts APIs for actual installed-font coverage; OEM images may differ."
+    },
+    {
+      "name": "Ubuntu desktop font package manifests",
+      "url": "https://packages.ubuntu.com/noble/ubuntu-desktop-minimal",
+      "coverage": "Ubuntu desktop metapackage dependency list, including fonts-dejavu-core, fonts-liberation, fonts-noto-core, fonts-noto-cjk, fonts-noto-color-emoji, and fonts-ubuntu. Scan /usr/share/fonts in a pinned install for cmap ranges."
+    }
+  ],
+  "badges": {
+    "ios": "Ap",
+    "android-aosp": "An",
+    "macos": "Ap",
+    "windows": "Wi",
+    "ubuntu": "Li"
+  },
+  "emojiPlatformSupport": {
+    "15.0": [
+      {
+        "target": "ios",
+        "version": "16.4"
+      },
+      {
+        "target": "android-aosp",
+        "version": "14"
+      },
+      {
+        "target": "macos",
+        "version": "13.3"
+      },
+      {
+        "target": "windows",
+        "version": "11-22H2"
+      },
+      {
+        "target": "ubuntu",
+        "version": "22.04"
+      }
+    ],
+    "15.1": [
+      {
+        "target": "ios",
+        "version": "17.4"
+      },
+      {
+        "target": "android-aosp",
+        "version": "15"
+      },
+      {
+        "target": "macos",
+        "version": "14.4"
+      },
+      {
+        "target": "windows",
+        "version": "11-24H2"
+      },
+      {
+        "target": "ubuntu",
+        "version": "24.04"
+      }
+    ],
+    "16.0": [
+      {
+        "target": "ios",
+        "version": "18.4"
+      },
+      {
+        "target": "android-aosp",
+        "version": "16"
+      },
+      {
+        "target": "macos",
+        "version": "15.4"
+      },
+      {
+        "target": "windows",
+        "version": "11-25H2"
+      },
+      {
+        "target": "ubuntu",
+        "version": "26.04"
+      }
+    ]
+  },
+  "fontCoverage": {
+    "ios": {
+      "current": {
+        "source": "provisional-assume-renderable-pending-cmap-scan",
+        "coverageMode": "includes-generic-fallbacks",
+        "notes": "Assume current iOS can render Unicode scalar fallback glyphs until a pinned iOS runtime/font bundle scan is available.",
+        "codepointCount": 1112064,
+        "ranges": [
+          "0000..D7FF",
+          "E000..10FFFF"
+        ]
+      }
+    },
+    "android-aosp": {
+      "current": {
+        "source": "provisional-assume-renderable-pending-cmap-scan",
+        "coverageMode": "includes-generic-fallbacks",
+        "notes": "AOSP ships broad Noto/Roboto font fallback; assume scalar fallback coverage until a pinned emulator/system-image scan is available.",
+        "codepointCount": 1112064,
+        "ranges": [
+          "0000..D7FF",
+          "E000..10FFFF"
+        ]
+      }
+    },
+    "macos": {
+      "current": {
+        "source": "system-font-cmap-scan",
+        "coverageMode": "includes-generic-fallbacks",
+        "generatedAt": "2026-09-09T05:53:34+00:00",
+        "fontCount": 378,
+        "codepointCount": 1112064,
+        "ranges": [
+          "0000..D7FF",
+          "E000..10FFFF"
+        ]
+      }
+    },
+    "windows": {
+      "current": {
+        "source": "provisional-assume-renderable-pending-cmap-scan",
+        "coverageMode": "includes-generic-fallbacks",
+        "notes": "Windows publishes a base font inventory including Segoe UI, Segoe UI Emoji, Segoe UI Historic, and Segoe UI Symbol; assume scalar fallback coverage until a pinned Windows font scan is available.",
+        "codepointCount": 1112064,
+        "ranges": [
+          "0000..D7FF",
+          "E000..10FFFF"
+        ]
+      }
+    },
+    "ubuntu": {
+      "current": {
+        "source": "provisional-assume-renderable-pending-cmap-scan",
+        "coverageMode": "includes-generic-fallbacks",
+        "notes": "Ubuntu desktop includes broad Noto, DejaVu, Liberation, Ubuntu, CJK, and color emoji font packages; assume scalar fallback coverage until a pinned Ubuntu image scan is available.",
+        "codepointCount": 1112064,
+        "ranges": [
+          "0000..D7FF",
+          "E000..10FFFF"
+        ]
+      }
+    }
+  }
+}

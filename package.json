@@ -1,0 +1,929 @@
+{
+  "name": "youhavecode",
+  "displayName": "YouHaveCode",
+  "description": "Need a Unicode symbol‽ Now you have the code‼",
+  "icon": "resources/icon.png",
+  "version": "0.0.1",
+  "license": "SEE LICENSE IN LICENSE",
+  "sponsor": {
+    "url": "https://cash.app/$neonash777"
+  },
+  "engines": {
+    "vscode": "^1.134.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "unicode",
+    "emoji",
+    "glyph",
+    "glyphs",
+    "symbol",
+    "symbols",
+    "codepoint",
+    "codepoints",
+    "unicode codepoint",
+    "emoji codepoint",
+    "character map",
+    "unicode search",
+    "emoji search",
+    "symbol search",
+    "insert symbol",
+    "insert emoji",
+    "special characters",
+    "special symbols",
+    "pretty print",
+    "ascii art",
+    "braille",
+    "braille art",
+    "block elements",
+    "emoji art",
+    "unicode art",
+    "text art",
+    "glyph art",
+    "fonts",
+    "font coverage",
+    "missing glyph",
+    "missing symbols",
+    "tofu",
+    "compatibility",
+    "platform compatibility",
+    "ios",
+    "android",
+    "windows",
+    "linux",
+    "ubuntu",
+    "macos",
+    "variation selector",
+    "VS15",
+    "VS16",
+    "unicode escape",
+    "html entity",
+    "character picker",
+    "unicode table",
+    "unicode blocks",
+    "custom tags",
+    "unicode tools",
+    "emoji tools",
+    "developer tools",
+    "donate",
+    "sponsor",
+    "support"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "extensionKind": [
+    "ui"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "YouHaveCode",
+      "properties": {
+        "youhavecode.triggerPrefix": {
+          "type": "string",
+          "default": "u:",
+          "pattern": "^[^\\s]+:$",
+          "description": "Prefix that opens chained Unicode completions. It must end with a colon."
+        },
+        "youhavecode.enableDoubleColonPrefix": {
+          "type": "boolean",
+          "default": true,
+          "description": "Open Unicode completions with :: or bounded :query: syntax; ::: remains available for repeated pretty-print insertion."
+        },
+        "youhavecode.emojiPresentation": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "color",
+            "text",
+            "deconstructed"
+          ],
+          "enumDescriptions": [
+            "Use the character's default Unicode presentation.",
+            "Append U+FE0F VARIATION SELECTOR-16 (VS16) to request emoji-style presentation; the renderer and font determine whether it is colored.",
+            "Append U+FE0E VARIATION SELECTOR-15 (VS15) to request text-style presentation.",
+            "Show the base separately, then label the selector and place its literal character on a dotted-circle carrier: ☀ + <VARIATION SELECTOR-16 (VS16, U+FE0F)> ◌️."
+          ],
+          "default": "auto",
+          "description": "Controls emoji-capable glyph insertion: preserve the default, request color or text presentation, or show the colored sequence as separate components."
+        },
+        "youhavecode.defaultOutput": {
+          "type": "string",
+          "enum": [
+            "glyph",
+            "components",
+            "unicode",
+            "codepoint",
+            "name",
+            "details",
+            "full",
+            "braille",
+            "block-elements",
+            "iphone-blocks",
+            "emoji",
+            "binary",
+            "hex"
+          ],
+          "default": "glyph",
+          "description": "Default output format for inserted glyphs. Explicit query options override this setting."
+        },
+        "youhavecode.defaultFilters": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": false,
+          "properties": {
+            "bidi": { "type": "string", "description": "Default bidirectional-class filter, including OR or negated values such as R|AL or !L." },
+            "category": { "type": "string", "description": "Default Unicode general-category filter." },
+            "combining": { "type": "string", "description": "Default canonical combining-class filter." },
+            "decomp": { "type": "string", "description": "Default decomposition-type filter." },
+            "lang": { "type": "string", "description": "Default language or script-family filter." },
+            "block": { "type": "string", "description": "Default Unicode block filter." },
+            "emoji": { "type": "string", "description": "Default emoji-presentation filter: COLOR, TEXT, or NONE." }
+          },
+          "description": "Property filters applied to every Unicode search. An explicit query filter with the same key replaces its default."
+        },
+        "youhavecode.defaultSearchTerms": {
+          "type": "array",
+          "default": [],
+          "uniqueItems": true,
+          "items": { "type": "string" },
+          "description": "Name words and custom tags applied to every Unicode search. These terms accumulate."
+        },
+        "youhavecode.disabledDefaultItems": {
+          "type": "array",
+          "default": [],
+          "uniqueItems": true,
+          "items": { "type": "string" },
+          "description": "Configured default property filters and search terms currently disabled in the sidebar."
+        },
+        "youhavecode.compatibilityTargets": {
+          "type": "object",
+          "additionalProperties": false,
+          "default": {
+            "ios": { "version": "current", "policy": "warn" },
+            "android-aosp": { "version": "current", "policy": "warn" },
+            "macos": { "version": "current", "policy": "warn" },
+            "windows": { "version": "current", "policy": "warn" },
+            "ubuntu": { "version": "current", "policy": "warn" }
+          },
+          "properties": {
+            "ios": { "type": "object", "additionalProperties": false, "properties": { "version": { "type": "string", "default": "current" }, "policy": { "type": "string", "enum": ["required", "warn", "permitted", "blocked"], "default": "warn" } }, "required": ["version", "policy"], "description": "Apple iOS base-install compatibility profile." },
+            "android-aosp": { "type": "object", "additionalProperties": false, "properties": { "version": { "type": "string", "default": "current" }, "policy": { "type": "string", "enum": ["required", "warn", "permitted", "blocked"], "default": "warn" } }, "required": ["version", "policy"], "description": "Android Open Source Project base-install compatibility profile; OEM fonts may differ." },
+            "macos": { "type": "object", "additionalProperties": false, "properties": { "version": { "type": "string", "default": "current" }, "policy": { "type": "string", "enum": ["required", "warn", "permitted", "blocked"], "default": "warn" } }, "required": ["version", "policy"], "description": "Apple macOS base-install compatibility profile." },
+            "windows": { "type": "object", "additionalProperties": false, "properties": { "version": { "type": "string", "default": "current" }, "policy": { "type": "string", "enum": ["required", "warn", "permitted", "blocked"], "default": "warn" } }, "required": ["version", "policy"], "description": "Microsoft Windows base-install compatibility profile." },
+            "ubuntu": { "type": "object", "additionalProperties": false, "properties": { "version": { "type": "string", "default": "current" }, "policy": { "type": "string", "enum": ["required", "warn", "permitted", "blocked"], "default": "warn" } }, "required": ["version", "policy"], "description": "Ubuntu base-install compatibility profile; Linux distributions differ." }
+          },
+          "description": "Versioned platform compatibility policies. Missing target entries inherit current + warn. Profiles configure future support verdicts; they do not claim coverage without bundled evidence."
+        },
+        "youhavecode.compatibilityUnknownPolicy": {
+          "type": "string",
+          "enum": ["warn", "permitted", "unlist"],
+          "enumDescriptions": ["Keep the glyph and warn when evidence is unavailable.", "Keep the glyph without a warning.", "Remove glyphs without reliable compatibility evidence."],
+          "default": "warn",
+          "description": "Behavior when the bundled compatibility data has no reliable verdict. Unknown is distinct from unsupported."
+        },
+        "youhavecode.compatibilityLocalFontPolicy": {
+          "type": "string",
+          "enum": ["warn", "permitted", "unlist"],
+          "enumDescriptions": ["Keep the glyph and warn when no installed font can render it.", "Keep the glyph without a warning.", "Remove glyphs that no installed font can render."],
+          "default": "warn",
+          "description": "Behavior when the local system-font probe cannot render a glyph. Custom fonts may provide additional coverage."
+        },
+        "youhavecode.bitmapSize": {
+          "type": "integer",
+          "default": 32,
+          "minimum": 8,
+          "maximum": 128,
+          "description": "Square source raster size in pixels for every bitmap text format."
+        },
+        "youhavecode.bitmapWrapLimit": {
+          "type": "integer",
+          "default": 0,
+          "minimum": -2,
+          "maximum": 1000,
+          "description": "Maximum text-cell extent along the flow axis before wrapping. Zero uses the editor column; -1 disables wrapping; -2 matches one transformed glyph."
+        },
+        "youhavecode.bitmapCompact": {
+          "type": "boolean",
+          "default": true,
+          "description": "Trim blank glyph edges while preserving one separator cell."
+        },
+        "youhavecode.bitmapGlyphMapping": {
+          "type": "string",
+          "enum": ["square", "baseline", "baseline-tight"],
+          "enumDescriptions": ["Normalize each glyph into a centered square raster.", "Preserve a common font baseline inside a fixed em box.", "Preserve the baseline while tightly sampling the typographic ascent and descent band."],
+          "default": "baseline",
+          "description": "Controls whether Pretty Print prioritizes square glyph shape or shared text baseline alignment."
+        },
+        "youhavecode.prettyPrintFontFamily": {
+          "type": "string",
+          "default": "",
+          "description": "Comma-separated Pretty Print font-family preference. Empty uses the active editor.fontFamily list, then platform-aware fallbacks."
+        },
+        "youhavecode.prettyPrintFontFamilyDisabled": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Pretty Print font families disabled in the Font Precedence sidebar menu."
+        },
+        "youhavecode.bitmapFlowDirection": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "lr",
+            "rl",
+            "ud",
+            "du"
+          ],
+          "enumDescriptions": [
+            "Derive writing and wrapping directions from the active D4 transform.",
+            "Left to right.",
+            "Right to left.",
+            "Top to bottom.",
+            "Bottom to top."
+          ],
+          "default": "auto",
+          "description": "Direction in which consecutive bitmap glyphs are written."
+        },
+        "youhavecode.bitmapWrapDirection": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "lr",
+            "rl",
+            "ud",
+            "du"
+          ],
+          "enumDescriptions": [
+            "Down for horizontal flow; right for vertical flow.",
+            "New lines progress left to right.",
+            "New lines progress right to left.",
+            "New lines progress top to bottom.",
+            "New lines progress bottom to top."
+          ],
+          "default": "auto",
+          "description": "Perpendicular direction in which wrapped lines or columns progress."
+        },
+        "youhavecode.bitmapD4": {
+          "type": "string",
+          "enum": [
+            "identity",
+            "rotate-90",
+            "rotate-180",
+            "rotate-270",
+            "mirror-left-right",
+            "flip-top-bottom",
+            "reflect-slash",
+            "reflect-backslash"
+          ],
+          "default": "identity",
+          "description": "Geometric D4 transform applied to each glyph raster before text packing."
+        },
+        "youhavecode.customArtProfiles": {
+          "type": "array",
+          "default": [
+            {
+              "name": "Classic Blocks",
+              "glyphs": "█",
+              "emptyGlyphs": "⠀",
+              "delegate": "cycle"
+            },
+            {
+              "name": "ASCII Hash",
+              "glyphs": "#",
+              "emptyGlyphs": " ",
+              "delegate": "cycle"
+            }
+          ],
+          "description": "Named filled/empty glyph palettes shown by Custom Art. Each string is segmented into Unicode graphemes.",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "glyphs",
+              "emptyGlyphs",
+              "delegate"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Profile name shown in the picker."
+              },
+              "glyphs": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Glyph set used for filled pixels."
+              },
+              "emptyGlyphs": {
+                "type": "string",
+                "description": "Glyph set used for empty pixels; an empty value falls back to a regular space."
+              },
+              "delegate": {
+                "type": "string",
+                "enum": [
+                  "cycle",
+                  "checker",
+                  "hash"
+                ],
+                "enumDescriptions": [
+                  "Cycle independently through filled and empty sets.",
+                  "Choose by row and column.",
+                  "Use a deterministic hash for a less repetitive distribution."
+                ],
+                "description": "Built-in strategy used to distribute glyphs from each set."
+              }
+            }
+          }
+        },
+        "youhavecode.delegateProfiles": {
+          "type": "object",
+          "default": {},
+          "description": "Named capability profiles for future custom delegates. Built-ins are restricted, workspace-read, and full-access. Full access is trusted execution, not a security sandbox.",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "extends": {
+                "type": "string",
+                "enum": [
+                  "restricted",
+                  "workspace-read",
+                  "full-access"
+                ],
+                "default": "restricted"
+              },
+              "allow": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "unicode.lookup",
+                    "raster.read",
+                    "settings.youhavecode.read",
+                    "storage.profile.read",
+                    "storage.profile.write",
+                    "editor.selection.read",
+                    "workspace.text.read",
+                    "workspace.text.write",
+                    "network.fetch",
+                    "commands.execute",
+                    "process.spawn",
+                    "extensionHost.fullAccess"
+                  ]
+                }
+              },
+              "deny": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "unicode.lookup",
+                    "raster.read",
+                    "settings.youhavecode.read",
+                    "storage.profile.read",
+                    "storage.profile.write",
+                    "editor.selection.read",
+                    "workspace.text.read",
+                    "workspace.text.write",
+                    "network.fetch",
+                    "commands.execute",
+                    "process.spawn",
+                    "extensionHost.fullAccess"
+                  ]
+                }
+              },
+              "limits": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "timeoutMs": {
+                    "type": "integer",
+                    "minimum": 10,
+                    "maximum": 30000,
+                    "default": 500
+                  },
+                  "memoryMb": {
+                    "type": "integer",
+                    "minimum": 8,
+                    "maximum": 512,
+                    "default": 32
+                  },
+                  "maxOutputCells": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000,
+                    "default": 20000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "youhavecode.delegateProfile": {
+          "type": "string",
+          "default": "restricted",
+          "description": "Active built-in or custom delegate capability profile. Use Delegate Profile from the YouHaveCode sidebar to switch with full-access confirmation."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "youhavecode.insertGlyph",
+        "title": "Search and Insert Unicode Glyph",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.chooseInsertionFormat",
+        "title": "Output Format",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.prettyPrintSelection",
+        "title": "Pretty Print Selected Glyph Stream",
+        "enablement": "editorHasSelection",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.prettyPrintImage",
+        "title": "Pretty Print Image",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.customArtSelection",
+        "title": "Create Custom Art from Selection",
+        "enablement": "editorHasSelection",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.resetUsageHistory",
+        "title": "Reset Usage History",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.clearRecentGlyphs",
+        "title": "Clear Recent Glyphs",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.clearFrequentGlyphs",
+        "title": "Clear Frequent Glyphs",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.toggleEditorLineWrapping",
+        "title": "Toggle Editor Line-Wrapping",
+        "icon": "$(word-wrap)",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.quickSidebarPrettyPrint",
+        "title": "Pretty Print",
+        "icon": "$(play)",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.sidebarInsertGlyph",
+        "title": "Insert",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.copySidebarGlyph",
+        "title": "Copy Glyph",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.appendSidebarGlyphToClipboard",
+        "title": "Append Glyph to Clipboard",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.removeParentTagFromGlyph",
+        "title": "Remove Tag",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.removeRecentGlyph",
+        "title": "Remove from Recent",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.removeFrequentGlyph",
+        "title": "Remove from Frequent",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.toggleSidebarDefaultItem",
+        "title": "Toggle Filter",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.clearSidebarDefaultItem",
+        "title": "Clear",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.manageGlyphTags",
+        "title": "Manage Tags",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.setGlyphDefaultFilter",
+        "title": "Set as Default Filter",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.searchSidebarTag",
+        "title": "Toggle as Filter",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.restrictSidebarTag",
+        "title": "Toggle as Restriction",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.cycleSidebarTagConstraint",
+        "title": "Cycle Filter / Restriction",
+        "icon": "$(filter)",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.setSidebarTagDefault",
+        "title": "Add as Default Filter",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.setSidebarTagExcludedDefault",
+        "title": "Add as Default Restriction",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.removeSidebarTagFirst",
+        "title": "Remove First Assignment",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.removeSidebarTagLast",
+        "title": "Remove Last Assignment",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.clearSidebarTag",
+        "title": "Clear All Assignments",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.refreshSidebar",
+        "title": "Refresh Unicode Sidebar",
+        "category": "YouHaveCode",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "youhavecode.chooseDelegateProfile",
+        "title": "Choose Delegate Profile",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.undoQueryComponent",
+        "title": "Undo Last Unicode Query Component",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.printWithAllFonts",
+        "title": "Print With Font Precedence",
+        "enablement": "youhavecode.developerDebugMode",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.prettyPrintAllSizes",
+        "title": "Pretty Print All Sizes",
+        "enablement": "youhavecode.developerDebugMode",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.prettyPrintAllTransforms",
+        "title": "Pretty Print All Transforms",
+        "enablement": "youhavecode.developerDebugMode",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.prettyPrintAllTypes",
+        "title": "Pretty Print All Types",
+        "enablement": "youhavecode.developerDebugMode",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.setDeveloperDebugMode",
+        "title": "Set Developer/Debug Mode",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.copyEditorFontFamilyToPrettyPrint",
+        "title": "Use Editor Font List for Pretty Print",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.togglePrettyPrintFontFamily",
+        "title": "Toggle Active",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.resetPrettyPrintFontFamilies",
+        "title": "Reset to Editor Font List",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.movePrettyPrintFontFamilyTop",
+        "title": "Move to Top",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.movePrettyPrintFontFamilyUp",
+        "title": "Move Up",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.movePrettyPrintFontFamilyDown",
+        "title": "Move Down",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.movePrettyPrintFontFamilyBottom",
+        "title": "Move to Bottom",
+        "category": "YouHaveCode"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "youhavecode",
+          "title": "YOUHAVECODE UNICODE",
+          "icon": "resources/unicode.svg"
+        }
+      ]
+    },
+    "views": {
+      "youhavecode": [
+        {
+          "id": "youhavecode.unicode",
+          "name": "YOUHAVECODE UNICODE"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "youhavecode.undoQueryComponent",
+        "key": "shift+tab",
+        "when": "editorTextFocus && youhavecode.queryActive"
+      },
+      {
+        "command": "youhavecode.acceptSelectedSuggestion",
+        "key": "tab",
+        "when": "editorTextFocus && suggestWidgetVisible && youhavecode.queryActive"
+      },
+      {
+        "command": "youhavecode.acceptSelectedSuggestion",
+        "key": "enter",
+        "when": "editorTextFocus && suggestWidgetVisible && youhavecode.queryActive"
+      },
+      {
+        "command": "youhavecode.selectPrevSuggestion",
+        "key": "up",
+        "when": "editorTextFocus && suggestWidgetVisible && youhavecode.queryActive"
+      },
+      {
+        "command": "youhavecode.selectNextSuggestion",
+        "key": "down",
+        "when": "editorTextFocus && suggestWidgetVisible && youhavecode.queryActive"
+      },
+      {
+        "command": "youhavecode.deleteLeftAndSuggest",
+        "key": "backspace",
+        "when": "editorTextFocus && youhavecode.queryActive"
+      },
+      {
+        "command": "youhavecode.deleteRightAndSuggest",
+        "key": "delete",
+        "when": "editorTextFocus && youhavecode.queryActive"
+      },
+      {
+        "command": "youhavecode.chooseInsertionFormat",
+        "key": "ctrl+alt+u",
+        "mac": "cmd+alt+u",
+        "when": "editorTextFocus"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "youhavecode.refreshSidebar",
+          "when": "view == youhavecode.unicode",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "youhavecode.clearRecentGlyphs",
+          "when": "view == youhavecode.unicode && viewItem == youhavecode.group.recent",
+          "group": "inline"
+        },
+        {
+          "command": "youhavecode.clearFrequentGlyphs",
+          "when": "view == youhavecode.unicode && viewItem == youhavecode.group.frequent",
+          "group": "inline"
+        },
+        {
+          "command": "youhavecode.toggleEditorLineWrapping",
+          "when": "view == youhavecode.unicode && viewItem == youhavecode.editorLineWrapping",
+          "group": "inline"
+        },
+        {
+          "command": "youhavecode.quickSidebarPrettyPrint",
+          "when": "view == youhavecode.unicode && viewItem == youhavecode.prettyPrintOutputChoice",
+          "group": "inline"
+        },
+        {
+          "command": "youhavecode.customArtSelection",
+          "when": "view == youhavecode.unicode && viewItem == youhavecode.prettyPrintCustomChoice",
+          "group": "inline"
+        },
+        {
+          "command": "youhavecode.movePrettyPrintFontFamilyTop",
+          "when": "view == youhavecode.unicode && viewItem == youhavecode.prettyPrintFontFamily",
+          "group": "font-order@1"
+        },
+        {
+          "command": "youhavecode.movePrettyPrintFontFamilyUp",
+          "when": "view == youhavecode.unicode && viewItem == youhavecode.prettyPrintFontFamily",
+          "group": "font-order@2"
+        },
+        {
+          "command": "youhavecode.movePrettyPrintFontFamilyDown",
+          "when": "view == youhavecode.unicode && viewItem == youhavecode.prettyPrintFontFamily",
+          "group": "font-order@3"
+        },
+        {
+          "command": "youhavecode.movePrettyPrintFontFamilyBottom",
+          "when": "view == youhavecode.unicode && viewItem == youhavecode.prettyPrintFontFamily",
+          "group": "font-order@4"
+        },
+        {
+          "command": "youhavecode.sidebarInsertGlyph",
+          "when": "view == youhavecode.unicode && (viewItem == youhavecode.glyph || viewItem == youhavecode.tagGlyph || viewItem == youhavecode.recentGlyph || viewItem == youhavecode.frequentGlyph)",
+          "group": "1_insert@1"
+        },
+        {
+          "command": "youhavecode.copySidebarGlyph",
+          "when": "view == youhavecode.unicode && (viewItem == youhavecode.glyph || viewItem == youhavecode.tagGlyph || viewItem == youhavecode.recentGlyph || viewItem == youhavecode.frequentGlyph)",
+          "group": "1_insert@2"
+        },
+        {
+          "command": "youhavecode.appendSidebarGlyphToClipboard",
+          "when": "view == youhavecode.unicode && (viewItem == youhavecode.glyph || viewItem == youhavecode.tagGlyph || viewItem == youhavecode.recentGlyph || viewItem == youhavecode.frequentGlyph)",
+          "group": "1_insert@3"
+        },
+        {
+          "command": "youhavecode.removeParentTagFromGlyph",
+          "when": "view == youhavecode.unicode && viewItem == youhavecode.tagGlyph",
+          "group": "2_tags@1"
+        },
+        {
+          "command": "youhavecode.removeRecentGlyph",
+          "when": "view == youhavecode.unicode && viewItem == youhavecode.recentGlyph",
+          "group": "2_remove"
+        },
+        {
+          "command": "youhavecode.removeFrequentGlyph",
+          "when": "view == youhavecode.unicode && viewItem == youhavecode.frequentGlyph",
+          "group": "2_remove"
+        },
+        {
+          "command": "youhavecode.manageGlyphTags",
+          "when": "view == youhavecode.unicode && (viewItem == youhavecode.glyph || viewItem == youhavecode.tagGlyph || viewItem == youhavecode.recentGlyph || viewItem == youhavecode.frequentGlyph)",
+          "group": "2_tags@2"
+        },
+        {
+          "command": "youhavecode.setGlyphDefaultFilter",
+          "when": "view == youhavecode.unicode && (viewItem == youhavecode.glyph || viewItem == youhavecode.tagGlyph || viewItem == youhavecode.recentGlyph || viewItem == youhavecode.frequentGlyph)",
+          "group": "3_filters"
+        },
+        {
+          "command": "youhavecode.toggleSidebarDefaultItem",
+          "when": "view == youhavecode.unicode && viewItem == youhavecode.defaultItem",
+          "group": "1_filter"
+        },
+        {
+          "command": "youhavecode.clearSidebarDefaultItem",
+          "when": "view == youhavecode.unicode && viewItem == youhavecode.defaultItem",
+          "group": "2_clear"
+        },
+        {
+          "command": "youhavecode.cycleSidebarTagConstraint",
+          "when": "view == youhavecode.unicode && viewItem == youhavecode.tag",
+          "group": "inline@1"
+        },
+        {
+          "command": "youhavecode.searchSidebarTag",
+          "when": "view == youhavecode.unicode && viewItem == youhavecode.tag",
+          "group": "1_search@1"
+        },
+        {
+          "command": "youhavecode.restrictSidebarTag",
+          "when": "view == youhavecode.unicode && viewItem == youhavecode.tag",
+          "group": "1_search@2"
+        },
+        {
+          "command": "youhavecode.setSidebarTagDefault",
+          "when": "view == youhavecode.unicode && viewItem == youhavecode.tag",
+          "group": "2_filter@1"
+        },
+        {
+          "command": "youhavecode.setSidebarTagExcludedDefault",
+          "when": "view == youhavecode.unicode && viewItem == youhavecode.tag",
+          "group": "2_filter@2"
+        },
+        {
+          "command": "youhavecode.removeSidebarTagFirst",
+          "when": "view == youhavecode.unicode && viewItem == youhavecode.tag",
+          "group": "3_remove@1"
+        },
+        {
+          "command": "youhavecode.removeSidebarTagLast",
+          "when": "view == youhavecode.unicode && viewItem == youhavecode.tag",
+          "group": "3_remove@2"
+        },
+        {
+          "command": "youhavecode.clearSidebarTag",
+          "when": "view == youhavecode.unicode && viewItem == youhavecode.tag",
+          "group": "4_clear"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "youhavecode.chooseInsertionFormat",
+          "when": "!editorHasSelection",
+          "group": "modification"
+        },
+        {
+          "command": "youhavecode.prettyPrintSelection",
+          "when": "editorHasSelection",
+          "group": "modification"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "sync-data": "node scripts/sync-data.mjs",
+    "prepare:dev": "node scripts/run-dev.mjs --prepare-only",
+    "prepare:dev:accessible": "node scripts/run-dev.mjs --accessible --prepare-only",
+    "dev": "npm run compile && npm-run-all -p watch:build-delayed launch:dev",
+    "launch:dev": "node scripts/run-dev.mjs",
+    "screenshots": "npm run compile && node scripts/capture-screenshots.mjs",
+    "compile": "npm run sync-data && npm run check-types && npm run lint && node esbuild.js",
+    "watch": "npm-run-all -p watch:*",
+    "watch:build-delayed": "node scripts/watch-build-delayed.mjs",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "package": "npm run sync-data && npm run check-types && npm run lint && node esbuild.js --production",
+    "release:prepare": "npm run package && npm run integrity:generate && npm run integrity:verify",
+    "integrity:generate": "node scripts/release-integrity.mjs generate",
+    "integrity:verify": "node scripts/release-integrity.mjs verify",
+    "integrity:artifact": "node scripts/release-integrity.mjs artifact",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "test:watch-delayed": "node scripts/watch-tests-delayed.mjs",
+    "validate:background": "npm run check-types && npm run lint && npm run compile-tests",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "24.x",
+    "@types/vscode": "^1.134.0",
+    "@vscode/test-cli": "^0.0.15",
+    "@vscode/test-electron": "^3.0.0",
+    "esbuild": "^0.28.1",
+    "eslint": "^10.5.0",
+    "npm-run-all": "^4.1.5",
+    "playwright-core": "^1.63.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.61.1"
+  },
+  "overrides": {
+    "diff": "^8.0.4",
+    "serialize-javascript": "^7.0.6"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^1.0.8"
+  }
+}

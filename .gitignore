@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Build and test output
+out/
+dist/
+.vscode-test/
+.test-status.json
+*.tsbuildinfo
+
+# Release/package artifacts
+*.vsix
+*.vsix.sha256
+vsc-extension-quickstart.md
+
+# Local editor and OS noise
+.DS_Store
+.vscode/settings.json
+.vscode/launch.json
+.vscode/tasks.json
+
+# Logs and temporary files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.tmp/
+tmp/
+coverage/
+
+# Local environment files
+.env
+.env.*
+!.env.example
