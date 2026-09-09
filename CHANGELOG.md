@@ -42,4 +42,3 @@ All notable changes to the YouHaveCode VS Code extension are documented here.
 - Windows, Ubuntu, Android AOSP, and iOS current font coverage profiles are provisional full-scalar assumptions until scanned from pinned reference images.
 - Exact glyph rendering depends on local fonts, VS Code/Electron rendering, and platform emoji behavior.
 - `scripts/export_emoji_rgi.py` at the repository root is currently whitespace-only; do not claim end-to-end emoji export reproducibility until restored.
-- README marketplace image diagnostics currently require package repository metadata before packaging.

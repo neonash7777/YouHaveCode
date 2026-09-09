@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "package": "youhavecode",
   "version": "0.0.1",
-  "generatedAt": "2026-09-09T07:00:25.345Z",
+  "generatedAt": "2026-09-09T07:17:03.464Z",
   "algorithm": "sha256",
   "dataProvenance": {
     "unicode": {
@@ -18,8 +18,8 @@
   "files": [
     {
       "path": "CHANGELOG.md",
-      "bytes": 3283,
-      "sha256": "5666d319ac2bd7d358bec8e0a113e73f9d087c58aaa7127c6ef5af1dd2cfb432"
+      "bytes": 3180,
+      "sha256": "aea0de6407177c8866261a526d45b3ec38fe977b71c145854b79b9f6dfd1549a"
     },
     {
       "path": "COMPATIBILITY_COVERAGE.md",
@@ -38,8 +38,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 27242,
-      "sha256": "aa400f764d4b5ff1647675c73e01b7c4b67b83352f6f27611da323207b24d302"
+      "bytes": 25936,
+      "sha256": "c627f0493ca82db28115fc9af2067ceb14a3e4b5a9f3cab6a73e70303d6ddef1"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
@@ -88,8 +88,8 @@
     },
     {
       "path": "package.json",
-      "bytes": 34830,
-      "sha256": "e60f12c8b6dfa24659bb578441e9a6536fb72de80b6ed2999e1fc2c798b819f8"
+      "bytes": 34932,
+      "sha256": "864841d8ea18e860a561e2f33141aed82520633d468ebef056dd0e99398b4dd1"
     },
     {
       "path": "scripts/release-integrity.mjs",

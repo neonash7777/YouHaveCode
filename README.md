@@ -36,16 +36,12 @@ If YouHaveCode saves you from another tab spiral through Unicode charts, search 
 Read `\u:(have)(code)` as a pocket-sized grammar hint: `\u:` requests glyph output, while adjacent parenthesized words demonstrate chained search terms. Replace `have` and `code` with the name, property, or custom tag you need.
 
 - Type `::` to search for and insert a glyph. After insertion, the full root menu reopens without leaving query text behind; prior query tokens appear first for quick reapplication, followed by the glyph just inserted. Choose another glyph or any search, tag, property, and output tool. Typing `line` continues the hidden query exactly like `::line`, including the `(line)` suggestion.
-- Put the caret between two colons (`:|:`) for bounded, Teams-style search. Typing produces `:line:`; accepting a glyph consumes both colons, inserts the glyph, and reopens the marker-free continuation menu. Identifier-qualified forms such as `std:|:` are ignored.
-- Type `:::` when you want the query marker and reusable filters to remain between repeated insertions.
 - After the colons, type a glyph, Unicode name word, code point, custom tag, or property key.
 - Press Tab to accept the top YouHaveCode result. Use Up or Down first to choose another result, then accept normally.
 
 Open the **u:** icon in the Activity Bar for **YOUHAVECODE UNICODE**. `Search and Insert` focuses the active editor, inserts `::` at each cursor or selection, and opens the same inline menu used while typing. Tags starts with `Create or Add Tag…`, then lists every custom tag alphabetically with a comma-free preview of its first and last assigned glyphs plus a compact count. Click a tag header to expand or collapse its assigned glyphs; use the cycle button at the right of the row to move that tag through required `(tag)`, restricted `(!tag)`, and absent states. Right-click a tag for direct `Toggle as Filter` and `Toggle as Restriction` actions, to add either form as the mutually exclusive default, or to remove assignments. Right-click any glyph row to insert it, copy it, append it directly to the clipboard without a separator, or remove it from the containing tag when applicable. Properties lists every property family and opens the selected property's values directly. Default Filters is a top-level section listing each configured property or search term; right-click one to toggle it without losing its value, or choose Clear to remove it. Disabled defaults remain visible in muted text. Tools contains expandable Output Format and Compatibility sections that work without an active query. Output Format includes text formats, bitmap formats, and all three pretty-print workflows. Compatibility lists every platform with its version and policy, with nested controls for changing either.
 
 Right-click Recent or Frequent to clear that list independently. Right-click an individual history glyph to remove it from Recent or wipe its Frequent usage count. Glyph rows also offer `Insert`, `Manage Tags`, and `Set as Default Filter`. Glyph property defaults replace the previous value for that property; name words and custom tags accumulate. When defaults eliminate every result, the no-match row identifies the active constraints. The tag manager opens at the top of the window with the glyph's assigned tags first as Remove actions, followed by Recent and Frequent tags as Add actions, then `New Tag…`. It stays open after each change so several tags can be edited in one visit. A clean installation starts with the `favorite` tag assigned to `★`; removing it remains persistent. Reset Usage History asks for confirmation before clearing recency, frequency, and replay history.
-
-`Custom Art…` maps filled and empty raster pixels through separate Unicode glyph sets. Ad hoc palettes offer Auto, Space, Monospace, and Empty Block backgrounds, optional additional empty glyphs, and deterministic Cycle, Checker, or Hash distribution. Add reusable objects to `youhavecode.customArtProfiles` with `name`, `glyphs`, `emptyGlyphs`, and `delegate` fields. Custom Art and the regular pretty-print walkthrough share a size menu containing Last Used, Last Custom, standard sizes, and the three latest custom sizes.
 
 Examples:
 
@@ -101,7 +97,7 @@ Accepted name chips become parenthesized filters. Name and custom-tag filters al
 
 The first query requires both Unicode name words. The second requires the name word `STAR` and the custom tag `favorites`.
 
-Shorthand `-` and `_` separators also chain words. `::closed-reversed` behaves like `::(closed)(reversed)`. Prefix a word with `!` to exclude it, as in `:::arrow-right-!left`.
+Shorthand `-` and `_` separators also chain words. `::closed-reversed` behaves like `::(closed)(reversed)`. Prefix a word with `!` to exclude it, as in `::arrow-right-!left`.
 
 ### Unicode Property Filters
 
@@ -156,6 +152,10 @@ Any name or custom-tag suggestion supported by only one remaining glyph is omitt
 
 Choose `Output Format…` to insert glyphs as Unicode escapes, code-point references, names, details, HTML entities, or bitmap text. Use `\u*query` for the configured bitmap format, or select existing text and run `Pretty Print`, `Pretty Print…`, or `Pretty Print*…` for progressively more control.
 
+| Lion | Phoenix |
+| --- | --- |
+| ![A lion rendered with colored Pretty Print output](https://images.squarespace-cdn.com/content/v1/680437d9e2a0b76194d51373/95bc0062-7e39-4384-b98d-94da2fdc6bea/Screenshot+2026-09-08+at+9.16.26%E2%80%AFPM.png?format=1500w) | ![A phoenix rendered with colored Pretty Print output](https://images.squarespace-cdn.com/content/v1/680437d9e2a0b76194d51373/bb8bec72-254c-44da-bceb-fa89e972ed77/Screenshot+2026-09-08+at+11.39.50%E2%80%AFPM.png?format=1000w) |
+
 ## Advanced And Technical
 
 ### Inline Query Actions
@@ -167,10 +167,6 @@ Action suggestions begin with `*`. Choosing `*print` inserts the canonical `(*pr
 ```
 
 `(compact=on)` removes unused edges along the active flow axis while preserving one blank separator cell. `(compact=off)` retains each square raster's full padding.
-
-### Repeating Mode And Reuse
-
-After a `:::` insertion, the root menu lists every token from the previous search as `Reuse (…)` entries in its original order. Accepting one removes it from the list and promotes the next token, so repeated Tab presses rebuild the prior query left-to-right.
 
 The five most recent glyphs appear in the empty root, followed by `Recent…`, which lists up to 25 glyphs by recency. `Frequent…` lists glyphs ranked by usage count. Both submenus stay in the suggestion widget and respect active filters. Name/tag chips with no glyphs under the active filters are omitted.
 
@@ -208,7 +204,7 @@ Bitmap format names are searchable directly. For example, `::braille` lists the 
 Explicit option syntax remains available, for example:
 
 ```text
-:::(output=braille)(size=16x16)(wrap=32)(flow=ud)(wrap-direction=rl)(*d4=reflect-slash)(star)
+::(output=braille)(size=16x16)(wrap=32)(flow=ud)(wrap-direction=rl)(*d4=reflect-slash)(star)
 ```
 
 Bitmap layout wraps only between complete glyph rasters. Horizontal flow creates rows; vertical flow creates columns. Reverse flow changes glyph order within each row or column, while reverse wrap direction changes row or column order.
@@ -217,7 +213,7 @@ Persistent defaults live under `youhavecode.defaultOutput` and the `youhavecode.
 
 There are two output workflows:
 
-1. Glyph insertion output transforms each accepted `::` or `:::` glyph independently.
+1. Glyph insertion output transforms each accepted `::` glyph independently.
 2. Select an existing Unicode message and press Cmd+Opt+U on macOS (Ctrl+Alt+U elsewhere) to transform the full selection. `Pretty Print` immediately reuses the last bitmap settings. `Pretty Print…` asks only for bitmap type and size while retaining and saving the other settings. `Pretty Print*…` walks through type, size, wrapping, spacing, flow, and transform; choose `Back` at any step to revise an earlier choice without losing the walkthrough state. Textual output transforms remain directly available below these actions.
 
 Bitmap conversion is local and self-contained; it does not require the Unicode Atlas backend. Emoji sequences are rasterized as complete grapheme clusters. A single selection is limited to 256 non-whitespace graphemes so native font rendering cannot exhaust the extension host; split larger messages into smaller selections.
@@ -264,9 +260,7 @@ The settings and menus are available now, but platform filtering and result indi
 
 ### Configuration
 
-The default `u:` completion prefix is configurable with `youhavecode.triggerPrefix`. Double- and triple-colon prefixes can be disabled with `youhavecode.enableDoubleColonPrefix`. Emoji presentation is configured with `youhavecode.emojiPresentation`.
-
-The detailed behavior contract for parsing, ranking, replay, and menu lifecycle is in `YOUHAVECODE_INTERACTIONS.md` in the project workspace.
+The default `u:` completion prefix is configurable with `youhavecode.triggerPrefix`. Double-colon completion can be disabled with `youhavecode.enableDoubleColonPrefix`. Emoji presentation is configured with `youhavecode.emojiPresentation`.
 
 YouHaveCode registers its completion provider for every known VS Code language so `::` queries participate in the highest provider group inside text, code, strings, and embedded editor contexts. Outside a valid query it returns no completions, leaving the host language's IntelliSense unchanged. VS Code does not expose token-range-exclusive completion providers; TextMate embedded-language grammars affect tokenization, not generic completion-provider ownership.
 
@@ -275,14 +269,14 @@ YouHaveCode registers its completion provider for every known VS Code language s
 From the repository root:
 
 ```bash
-npm install --prefix apps/vscode-extension
-npm run compile --prefix apps/vscode-extension
+npm install
+npm run compile
 ```
 
 Refresh the Marketplace/README screenshots from a clean, isolated VS Code profile with:
 
 ```bash
-npm run screenshots --prefix apps/vscode-extension
+npm run screenshots
 ```
 
 The script fixes the theme, editor typography, and window size; seeds representative custom-tag and compatibility usage through the real extension UI; and clips each active suggestion menu or sidebar view into `media/screenshots`. Pass scenario names after `--` to regenerate a subset, or add `--keep-open` to inspect the isolated window after capture.
@@ -292,15 +286,6 @@ Current scenarios are `root-menu`, `properties-menu`, `output-format-menu`, `cus
 For the first Marketplace pass, the highest-signal set is `root-menu`, `sidebar-overview`, `unicode-table-sidebar`, `output-format-menu`, `pretty-print-settings-sidebar`, `compatibility-warning-menu`, and `tag-search-menu`.
 
 Local bitmap rendering uses a native Canvas dependency. Publish platform-targeted VSIX packages from matching build agents with `vsce package --target <platform>` so each package contains the correct native binary.
-
-Regenerate the bundled Unicode source data with:
-
-```bash
-./.venv/bin/python scripts/export_compact_unicode.py
-./.venv/bin/python scripts/export_emoji_rgi.py
-```
-
-The emoji exporter is pinned to Emoji 17.0 and accepts a downloaded `emoji-test.txt` path through `--source` when the local Python certificate store cannot reach unicode.org directly.
 
 Delegate capability profiles and their security boundary are documented in
 `DELEGATE_SECURITY.md`. The built-in `full-access`
