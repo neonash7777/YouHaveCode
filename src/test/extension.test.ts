@@ -490,6 +490,8 @@ suite('Unicode sidebar', () => {
   assert.strictEqual(extension.packageJSON.contributes.viewsContainers.activitybar[0].title, 'YOUHAVECODE UNICODE');
   assert.strictEqual(extension.packageJSON.contributes.viewsContainers.activitybar[0].icon, 'resources/unicode.svg');
   assert.strictEqual(extension.packageJSON.contributes.views.youhavecode[0].name, 'YouHaveCode::Unicode');
+  assert.ok(extension.packageJSON.contributes.commands.some((item: { command?: string; title?: string }) => item.command === 'youhavecode.prettyPrintWithDefaults' && item.title === 'Pretty Print Selection or Clipboard'));
+  assert.ok(extension.packageJSON.contributes.keybindings.some((item: { command?: string; key?: string; mac?: string }) => item.command === 'youhavecode.prettyPrintWithDefaults' && item.key === 'ctrl+alt+p' && item.mac === 'cmd+alt+p'));
   assert.ok(extension.packageJSON.contributes.menus['view/item/context'].some((item: { command?: string }) => item.command === 'youhavecode.clearRecentGlyphs'));
   assert.ok(extension.packageJSON.contributes.menus['view/item/context'].some((item: { command?: string }) => item.command === 'youhavecode.copySidebarGlyph'));
   assert.ok(extension.packageJSON.contributes.menus['view/item/context'].some((item: { command?: string }) => item.command === 'youhavecode.appendSidebarGlyphToClipboard'));
@@ -526,6 +528,41 @@ suite('Unicode sidebar', () => {
   assert.strictEqual(properties['youhavecode.compatibilityLocalFontPolicy'].default, 'warn');
   assert.deepStrictEqual(properties['youhavecode.compatibilityTargets'].default.ios, { version: 'current', policy: 'warn' });
   assert.deepStrictEqual(properties['youhavecode.disabledDefaultItems'].default, []);
+ });
+
+ test('pretty prints a selection or clipboard text at the cursor', async () => {
+  const configuration = vscode.workspace.getConfiguration('youhavecode');
+  const previousClipboard = await vscode.env.clipboard.readText();
+  try {
+   await Promise.all([
+    configuration.update('defaultOutput', 'binary', vscode.ConfigurationTarget.Global),
+    configuration.update('bitmapSize', 8, vscode.ConfigurationTarget.Global),
+    configuration.update('bitmapWrapLimit', -1, vscode.ConfigurationTarget.Global),
+    configuration.update('bitmapCompact', true, vscode.ConfigurationTarget.Global),
+   ]);
+
+   const selectedDocument = await vscode.workspace.openTextDocument({ language: 'plaintext', content: 'A' });
+   const selectedEditor = await vscode.window.showTextDocument(selectedDocument);
+   selectedEditor.selection = new vscode.Selection(0, 0, 0, 1);
+   await vscode.commands.executeCommand('youhavecode.prettyPrintWithDefaults');
+   assert.notStrictEqual(selectedDocument.getText(), 'A');
+   assert.ok(selectedEditor.selections.every(selection => !selection.isEmpty));
+
+   await vscode.env.clipboard.writeText('B');
+   const clipboardDocument = await vscode.workspace.openTextDocument({ language: 'plaintext', content: 'before' });
+   const clipboardEditor = await vscode.window.showTextDocument(clipboardDocument);
+   clipboardEditor.selection = new vscode.Selection(0, 6, 0, 6);
+   await vscode.commands.executeCommand('youhavecode.prettyPrintWithDefaults');
+   assert.match(clipboardDocument.getText(), /^before\n[01\n]+$/u);
+  } finally {
+   await vscode.env.clipboard.writeText(previousClipboard);
+   await Promise.all([
+    configuration.update('defaultOutput', undefined, vscode.ConfigurationTarget.Global),
+    configuration.update('bitmapSize', undefined, vscode.ConfigurationTarget.Global),
+    configuration.update('bitmapWrapLimit', undefined, vscode.ConfigurationTarget.Global),
+    configuration.update('bitmapCompact', undefined, vscode.ConfigurationTarget.Global),
+   ]);
+  }
  });
 });
 

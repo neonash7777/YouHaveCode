@@ -16,7 +16,8 @@ Start typing. YouHaveCode meets you in the editor:
 | `::` | Open the full search menu, then start typing or browse. |
 | `\u...` | Find a character and insert the right native escape for the current language. |
 | `\u:...` | Insert the actual glyph. |
-| `::...*` | Turn the result into Braille, block, emoji, binary, hex, or other bitmap art. |
+| `\u*...` | Find a glyph and turn it into Braille, block, emoji, binary, hex, or other bitmap art. |
+| `Cmd+Option+P` / `Ctrl+Alt+P` | Pretty Print the selection, or render clipboard text at the cursor. |
 
 YouHaveCode is for the moment between “I know that symbol exists” and “what was its code point again?” It gives glyph search, emoji, Unicode properties, custom tags, compatibility hints, font-aware rendering, and Pretty Print output one fast home inside the editor.
 
@@ -87,7 +88,6 @@ Use `u:` and `::` for the configured insertion format, or start with `\u` and a 
 | `\uquery` | Native Unicode-escape assistance | `\u{1F680}` in JavaScript |
 | `\u\query` | Explicit language-native escape | `\U0001F680` in Python |
 | `\u*query` | Pretty print using the configured bitmap format | Braille bitmap by default |
-| `::query*` | Fast pretty print using the configured bitmap format | Same output as `\u*query` |
 | `\u:query` | Actual glyph | `🚀` |
 | `\u#query` | Unicode code-point reference | `U+1F680` |
 | `\u&query` | Hexadecimal HTML numeric entity | `&#x1F680;` |
@@ -101,7 +101,7 @@ Queries are not restricted to hexadecimal code points:
 \u:script=Greek
 ```
 
-JavaScript and TypeScript use `\uXXXX` for BMP characters and `\u{XXXXX}` for supplementary characters. Rust, Swift, and PHP use braced escapes. Python, C#, Go, C, and C++ use `\uXXXX` or `\UXXXXXXXX`. Java, Kotlin, JSON, and unknown languages fall back to UTF-16 `\uXXXX` sequences. CSS-family documents use CSS escapes; HTML, XML, and Markdown use numeric entities. Bare `\u` augments native escape entry, while `\u\` explicitly requests escaped output. `\u*query` and the faster `::query*` suffix use the configured bitmap output and layout settings; when the configured insertion output is textual, they fall back to Braille.
+JavaScript and TypeScript use `\uXXXX` for BMP characters and `\u{XXXXX}` for supplementary characters. Rust, Swift, and PHP use braced escapes. Python, C#, Go, C, and C++ use `\uXXXX` or `\UXXXXXXXX`. Java, Kotlin, JSON, and unknown languages fall back to UTF-16 `\uXXXX` sequences. CSS-family documents use CSS escapes; HTML, XML, and Markdown use numeric entities. Bare `\u` augments native escape entry, while `\u\` explicitly requests escaped output. `\u*query` uses the configured bitmap output and layout settings; when the configured insertion output is textual, it falls back to Braille.
 
 ### Name And Tag Filters
 
@@ -167,7 +167,7 @@ Any name or custom-tag suggestion supported by only one remaining glyph is omitt
 
 ![Text and pretty-print output formats](https://images.squarespace-cdn.com/content/v1/680437d9e2a0b76194d51373/0d134cfd-e07c-40a7-b957-e1542dc18a50/output-format-menu.png?format=500w)
 
-Choose `Output Format…` to insert glyphs as Unicode escapes, code-point references, names, details, HTML entities, or bitmap text. Use `\u*query` for the configured bitmap format, or select existing text and run `Pretty Print`, `Pretty Print…`, or `Pretty Print*…` for progressively more control.
+Choose `Output Format…` to insert glyphs as Unicode escapes, code-point references, names, details, HTML entities, or bitmap text. Use `\u*query` for the configured bitmap format. Press **Cmd+Option+P** on macOS or **Ctrl+Alt+P** elsewhere to Pretty Print selected text with current settings; with no selection, the same shortcut renders clipboard text at the cursor. `Pretty Print`, `Pretty Print…`, and `Pretty Print*…` provide progressively more control.
 
 Pretty Print uses the fonts already installed on your machine, preserves complete emoji grapheme clusters, and can rotate, mirror, wrap, compact, and redirect output without sending editor content to a service.
 
@@ -236,7 +236,7 @@ Persistent defaults live under `youhavecode.defaultOutput` and the `youhavecode.
 There are two output workflows:
 
 1. Glyph insertion output transforms each accepted `::` glyph independently.
-2. Select an existing Unicode message and press Cmd+Opt+U on macOS (Ctrl+Alt+U elsewhere) to transform the full selection. `Pretty Print` immediately reuses the last bitmap settings. `Pretty Print…` asks only for bitmap type and size while retaining and saving the other settings. `Pretty Print*…` walks through type, size, wrapping, spacing, flow, and transform; choose `Back` at any step to revise an earlier choice without losing the walkthrough state. Textual output transforms remain directly available below these actions.
+2. Select an existing Unicode message and press Cmd+Option+P on macOS (Ctrl+Alt+P elsewhere) to transform the full selection with current Pretty Print settings. With no selection, the shortcut reads text from the clipboard and inserts its rendering at each cursor. Cmd+Option+U on macOS (Ctrl+Alt+U elsewhere) opens the broader output-format chooser. `Pretty Print…` asks only for bitmap type and size while retaining and saving the other settings. `Pretty Print*…` walks through type, size, wrapping, spacing, flow, and transform; choose `Back` at any step to revise an earlier choice without losing the walkthrough state. Textual output transforms remain directly available below these actions.
 
 Bitmap conversion is local and self-contained; it does not require the Unicode Atlas backend. Emoji sequences are rasterized as complete grapheme clusters. A single selection is limited to 256 non-whitespace graphemes so native font rendering cannot exhaust the extension host; split larger messages into smaller selections.
 

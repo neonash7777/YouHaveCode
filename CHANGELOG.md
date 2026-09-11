@@ -9,6 +9,7 @@ All notable changes to the YouHaveCode VS Code extension are documented here.
 ### Added
 
 - Cross-platform native integration tests against both the minimum supported and current stable VS Code before packaging Windows x64, Linux x64, macOS Intel, and macOS Apple Silicon VSIX artifacts.
+- Add `Cmd+Option+P` / `Ctrl+Alt+P` for Pretty Printing selected text, or clipboard text at the cursor when no text is selected.
 
 ### Changed
 
@@ -20,6 +21,7 @@ All notable changes to the YouHaveCode VS Code extension are documented here.
 - Rename the sidebar view to `YouHaveCode::Unicode`.
 - Lead the Marketplace overview with Pretty Print artwork, quick query examples, and direct installation options; move Tip Jar below the feature tour.
 - Update `@napi-rs/canvas` to 1.0.9 for the latest native platform fixes.
+- Correct the documentation to use supported `\u*query` Pretty Print syntax instead of `::query*`.
 
 ## [0.0.1] - First Preview
 

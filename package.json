@@ -456,6 +456,11 @@
         "category": "YouHaveCode"
       },
       {
+        "command": "youhavecode.prettyPrintWithDefaults",
+        "title": "Pretty Print Selection or Clipboard",
+        "category": "YouHaveCode"
+      },
+      {
         "command": "youhavecode.prettyPrintImage",
         "title": "Pretty Print Image",
         "category": "YouHaveCode"
@@ -722,6 +727,12 @@
         "command": "youhavecode.chooseInsertionFormat",
         "key": "ctrl+alt+u",
         "mac": "cmd+alt+u",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "youhavecode.prettyPrintWithDefaults",
+        "key": "ctrl+alt+p",
+        "mac": "cmd+alt+p",
         "when": "editorTextFocus"
       }
     ],
