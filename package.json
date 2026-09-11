@@ -4,7 +4,7 @@
   "publisher": "BrockNash",
   "description": "Need a Unicode symbol‽ Now you have the code‼",
   "icon": "resources/icon.png",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "SEE LICENSE IN LICENSE",
   "repository": {
     "type": "git",
@@ -678,7 +678,7 @@
       "youhavecode": [
         {
           "id": "youhavecode.unicode",
-          "name": "YOUHAVECODE UNICODE"
+          "name": "YouHaveCode::Unicode"
         }
       ]
     },
@@ -929,6 +929,6 @@
     "serialize-javascript": "^7.0.6"
   },
   "dependencies": {
-    "@napi-rs/canvas": "^1.0.8"
+    "@napi-rs/canvas": "^1.0.9"
   }
 }

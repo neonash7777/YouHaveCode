@@ -259,8 +259,9 @@ suite('Unicode sidebar', () => {
    compatibility: () => ({ targets: resolveCompatibilityTargets({ ios: { version: '18', policy: 'required' } }), unknown: 'warn', localFont: 'permitted' }),
   });
   const root = await provider.getChildren();
-  assert.deepStrictEqual(root.map(item => item.label), ['Search and Insert', 'Recent', 'Frequent', 'Tags', 'Properties', 'Unicode Table', 'Pretty Print', 'Default Filters', 'Tools']);
+  assert.deepStrictEqual(root.map(item => item.label), ['Search and Insert', 'Recent', 'Frequent', 'Output Format', 'Tags', 'Properties', 'Unicode Table', 'Pretty Print', 'Default Filters', 'Tools']);
   assert.strictEqual(root[0].description, undefined);
+  assert.strictEqual(root.find(item => item.group === 'outputFormat')?.description, 'Braille dots');
   assert.strictEqual(root.find(item => item.group === 'recent')?.contextValue, 'youhavecode.group.recent');
 
   const recent = await provider.getChildren(root.find(item => item.group === 'recent'));
@@ -343,8 +344,9 @@ suite('Unicode sidebar', () => {
   assert.ok([prettyPrintType, lineLength, writingDirection, wrapDirection, transforms].every(items => items.some(item => item.description === 'selected')));
   assert.deepStrictEqual(transforms.map(item => item.iconPath instanceof vscode.ThemeIcon ? item.iconPath.id : undefined), ['check', 'd4-rotate-90', 'd4-rotate-180', 'd4-rotate-270', 'd4-mirror-left-right', 'd4-flip-top-bottom', 'd4-reflect-slash', 'd4-reflect-backslash']);
   const tools = await provider.getChildren(root.find(item => item.group === 'tools'));
-  assert.deepStrictEqual(tools.slice(0, 2).map(item => item.group), ['outputFormat', 'compatibility']);
-  const output = await provider.getChildren(tools[0]);
+  assert.strictEqual(tools[0].group, 'compatibility');
+  assert.ok(!tools.some(item => item.group === 'outputFormat'));
+  const output = await provider.getChildren(root.find(item => item.group === 'outputFormat'));
   const selectedOutput = output.find(item => item.label === 'Braille dots');
   assert.ok(selectedOutput?.iconPath instanceof vscode.ThemeIcon);
   assert.strictEqual(selectedOutput.iconPath.id, 'check');
@@ -357,7 +359,7 @@ suite('Unicode sidebar', () => {
    ['youhavecode.defaultItem', 'Disabled', 'property', 'category'],
    ['youhavecode.defaultItem', undefined, 'term', 'favorite'],
   ]);
-  const compatibility = await provider.getChildren(tools[1]);
+  const compatibility = await provider.getChildren(tools[0]);
   assert.strictEqual(compatibility[0].label, 'iOS · 18 · required');
   assert.strictEqual(new Set(compatibility.filter(item => item.group === 'compatibilityTarget' || item.group === 'compatibilityFallback').map(item => item.id)).size, 7);
   const localFont = compatibility.find(item => item.label === 'Local Font · permitted');
@@ -487,7 +489,7 @@ suite('Unicode sidebar', () => {
   assert.strictEqual(extension.packageJSON.contributes.viewsContainers.activitybar[0].id, 'youhavecode');
   assert.strictEqual(extension.packageJSON.contributes.viewsContainers.activitybar[0].title, 'YOUHAVECODE UNICODE');
   assert.strictEqual(extension.packageJSON.contributes.viewsContainers.activitybar[0].icon, 'resources/unicode.svg');
-  assert.strictEqual(extension.packageJSON.contributes.views.youhavecode[0].name, 'YOUHAVECODE UNICODE');
+  assert.strictEqual(extension.packageJSON.contributes.views.youhavecode[0].name, 'YouHaveCode::Unicode');
   assert.ok(extension.packageJSON.contributes.menus['view/item/context'].some((item: { command?: string }) => item.command === 'youhavecode.clearRecentGlyphs'));
   assert.ok(extension.packageJSON.contributes.menus['view/item/context'].some((item: { command?: string }) => item.command === 'youhavecode.copySidebarGlyph'));
   assert.ok(extension.packageJSON.contributes.menus['view/item/context'].some((item: { command?: string }) => item.command === 'youhavecode.appendSidebarGlyphToClipboard'));
@@ -2944,5 +2946,22 @@ test('matches glyph size by placing each compact glyph in its own group', () => 
 
  test('flows glyphs vertically and wraps into right-to-left columns', () => {
   assert.strictEqual(composeBitmapText(['A', 'B', 'C'], '.', { maxExtent: 3, flowDirection: 'ud', wrapDirection: 'rl' }), 'C.A\n.. .'.replace(' ', '') + '\n..B');
+ });
+});
+
+suite('Platform native integration', () => {
+ test('loads the expected target and rasterizes glyphs and images', async () => {
+  if (process.env.EXPECTED_PLATFORM) { assert.strictEqual(process.platform, process.env.EXPECTED_PLATFORM); }
+  if (process.env.EXPECTED_ARCH) { assert.strictEqual(process.arch, process.env.EXPECTED_ARCH); }
+
+  const glyph = rasterizeGlyph('A', 16);
+  assert.strictEqual(glyph.length, 16);
+  assert.ok(glyph.every(row => row.length === 16 && /^[01]+$/u.test(row)));
+  assert.ok(glyph.some(row => row.includes('1')));
+
+  const image = await rasterizeImage(glyphIconPng('A', 16, '#000000'), 8);
+  assert.strictEqual(image.length, 8);
+  assert.ok(image.every(row => row.length === 8 && /^[01]+$/u.test(row)));
+  assert.ok(image.some(row => row.includes('1')));
  });
 });

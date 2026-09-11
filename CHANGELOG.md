@@ -4,10 +4,22 @@ All notable changes to the YouHaveCode VS Code extension are documented here.
 
 ## [Unreleased]
 
+## [0.0.2] - 2026-09-11
+
+### Added
+
+- Cross-platform native integration tests against both the minimum supported and current stable VS Code before packaging Windows x64, Linux x64, macOS Intel, and macOS Apple Silicon VSIX artifacts.
+
+### Changed
+
 - Polish release packaging, integrity metadata, and marketplace copy before the first public VSIX.
 - Refresh marketplace wording, search keywords, and support-development links.
 - Clarify proprietary licensing, generated output rights, and compatibility-profile provenance.
 - Expand screenshot capture scenarios for sidebar, Unicode Table, Pretty Print settings, and compatibility warnings.
+- Move Output Format into the sidebar root after Frequent and show the active format in its description.
+- Rename the sidebar view to `YouHaveCode::Unicode`.
+- Lead the Marketplace overview with Pretty Print artwork, quick query examples, and direct installation options; move Tip Jar below the feature tour.
+- Update `@napi-rs/canvas` to 1.0.9 for the latest native platform fixes.
 
 ## [0.0.1] - First Preview
 

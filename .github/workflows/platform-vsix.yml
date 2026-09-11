@@ -18,13 +18,26 @@ jobs:
         include:
           - os: windows-latest
             target: win32-x64
+            platform: win32
+            arch: x64
           - os: ubuntu-latest
             target: linux-x64
+            platform: linux
+            arch: x64
           - os: macos-15-intel
             target: darwin-x64
+            platform: darwin
+            arch: x64
+          - os: macos-15
+            target: darwin-arm64
+            platform: darwin
+            arch: arm64
     runs-on: ${{ matrix.os }}
     env:
       TARGET: ${{ matrix.target }}
+      EXPECTED_PLATFORM: ${{ matrix.platform }}
+      EXPECTED_ARCH: ${{ matrix.arch }}
+      MINIMUM_VSCODE_VERSION: 1.134.0
 
     steps:
       - name: Check out source
@@ -38,6 +51,27 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Compile tests
+        run: npm run compile-tests
+
+      - name: Test native integration on minimum supported VS Code
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            xvfb-run -a npx vscode-test --code-version "$MINIMUM_VSCODE_VERSION" --grep "Platform native integration"
+          else
+            npx vscode-test --code-version "$MINIMUM_VSCODE_VERSION" --grep "Platform native integration"
+          fi
+
+      - name: Test native integration on current stable VS Code
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            xvfb-run -a npx vscode-test --code-version stable --grep "Platform native integration"
+          else
+            npx vscode-test --code-version stable --grep "Platform native integration"
+          fi
 
       - name: Build and verify release inputs
         run: npm run release:prepare

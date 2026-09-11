@@ -1,19 +1,36 @@
 # YouHaveCode
 
-**YouHaveCode** + `\u:(have)(code)`
-
 > Need a Unicode symbol‽ Now you have the code‼
 
-The simplest way to search, inspect, insert, transform, and pretty-print Unicode and emoji code points without leaving VS Code.
+Search, inspect, insert, transform, and pretty-print Unicode and emoji without leaving VS Code.
 
-YouHaveCode is built for the moments when the symbol you need is somewhere between “I know it exists” and “what was that code point again?” It gives Unicode, emoji, glyphs, symbols, tags, compatibility hints, font-aware rendering, and Pretty Print output one fast home inside the editor.
+| Lion | Phoenix |
+| --- | --- |
+| ![A lion rendered with colored Pretty Print output](https://images.squarespace-cdn.com/content/v1/680437d9e2a0b76194d51373/95bc0062-7e39-4384-b98d-94da2fdc6bea/Screenshot+2026-09-08+at+9.16.26%E2%80%AFPM.png?format=1500w) | ![A phoenix rendered with colored Pretty Print output](https://images.squarespace-cdn.com/content/v1/680437d9e2a0b76194d51373/bb8bec72-254c-44da-bceb-fa89e972ed77/Screenshot+2026-09-08+at+11.39.50%E2%80%AFPM.png?format=1000w) |
 
-## Tip Jar
+Start typing. YouHaveCode meets you in the editor:
 
-If YouHaveCode saves you from another tab spiral through Unicode charts, search engines, missing-glyph boxes, emoji tables, and copy-paste limbo, you can help fund the next round of polish. Tips support Unicode data updates, platform compatibility profiles, font coverage scans, Pretty Print rendering work, and release packaging.
+| Type | What happens |
+| --- | --- |
+| `::_____...` | Search for any Unicode glyph or emoji by name, property, tag, character, or code point. |
+| `::` | Open the full search menu, then start typing or browse. |
+| `\u...` | Find a character and insert the right native escape for the current language. |
+| `\u:...` | Insert the actual glyph. |
+| `::...*` | Turn the result into Braille, block, emoji, binary, hex, or other bitmap art. |
 
-- Venmo: [@neonash777](https://venmo.com/neonash777)
-- Cash App: [$neonash777](https://cash.app/$neonash777)
+YouHaveCode is for the moment between “I know that symbol exists” and “what was its code point again?” It gives glyph search, emoji, Unicode properties, custom tags, compatibility hints, font-aware rendering, and Pretty Print output one fast home inside the editor.
+
+## Install
+
+Open **Extensions** in VS Code, search for **YouHaveCode**, and choose **Install**. Then type `::` in any editor.
+
+[Install YouHaveCode from the Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=BrockNash.youhavecode)
+
+```bash
+code --install-extension BrockNash.youhavecode
+```
+
+No account or external service is required for Unicode search and local bitmap rendering.
 
 ## Find A Feature
 
@@ -23,9 +40,9 @@ If YouHaveCode saves you from another tab spiral through Unicode charts, search 
 - [Filter by Unicode properties](#unicode-property-filters)
 - [Create and assign custom tags](#custom-tags)
 - [Pretty print Unicode text](#pretty-print)
-- [Support development](#tip-jar)
 - [Advanced query controls](#advanced-and-technical)
 - [Configure YouHaveCode](#configuration)
+- [Support development](#tip-jar)
 
 ## Features
 
@@ -39,7 +56,7 @@ Read `\u:(have)(code)` as a pocket-sized grammar hint: `\u:` requests glyph outp
 - After the colons, type a glyph, Unicode name word, code point, custom tag, or property key.
 - Press Tab to accept the top YouHaveCode result. Use Up or Down first to choose another result, then accept normally.
 
-Open the **u:** icon in the Activity Bar for **YOUHAVECODE UNICODE**. `Search and Insert` focuses the active editor, inserts `::` at each cursor or selection, and opens the same inline menu used while typing. Tags starts with `Create or Add Tag…`, then lists every custom tag alphabetically with a comma-free preview of its first and last assigned glyphs plus a compact count. Click a tag header to expand or collapse its assigned glyphs; use the cycle button at the right of the row to move that tag through required `(tag)`, restricted `(!tag)`, and absent states. Right-click a tag for direct `Toggle as Filter` and `Toggle as Restriction` actions, to add either form as the mutually exclusive default, or to remove assignments. Right-click any glyph row to insert it, copy it, append it directly to the clipboard without a separator, or remove it from the containing tag when applicable. Properties lists every property family and opens the selected property's values directly. Default Filters is a top-level section listing each configured property or search term; right-click one to toggle it without losing its value, or choose Clear to remove it. Disabled defaults remain visible in muted text. Tools contains expandable Output Format and Compatibility sections that work without an active query. Output Format includes text formats, bitmap formats, and all three pretty-print workflows. Compatibility lists every platform with its version and policy, with nested controls for changing either.
+Open the **u:** icon in the Activity Bar for **YouHaveCode::Unicode**. `Search and Insert` focuses the active editor, inserts `::` at each cursor or selection, and opens the same inline menu used while typing. Tags starts with `Create or Add Tag…`, then lists every custom tag alphabetically with a comma-free preview of its first and last assigned glyphs plus a compact count. Click a tag header to expand or collapse its assigned glyphs; use the cycle button at the right of the row to move that tag through required `(tag)`, restricted `(!tag)`, and absent states. Right-click a tag for direct `Toggle as Filter` and `Toggle as Restriction` actions, to add either form as the mutually exclusive default, or to remove assignments. Right-click any glyph row to insert it, copy it, append it directly to the clipboard without a separator, or remove it from the containing tag when applicable. Properties lists every property family and opens the selected property's values directly. Default Filters is a top-level section listing each configured property or search term; right-click one to toggle it without losing its value, or choose Clear to remove it. Disabled defaults remain visible in muted text. Output Format is a top-level section immediately after Frequent and shows the active format in its description. Tools contains Compatibility, extension settings, and usage-history controls. Compatibility lists every platform with its version and policy, with nested controls for changing either.
 
 Right-click Recent or Frequent to clear that list independently. Right-click an individual history glyph to remove it from Recent or wipe its Frequent usage count. Glyph rows also offer `Insert`, `Manage Tags`, and `Set as Default Filter`. Glyph property defaults replace the previous value for that property; name words and custom tags accumulate. When defaults eliminate every result, the no-match row identifies the active constraints. The tag manager opens at the top of the window with the glyph's assigned tags first as Remove actions, followed by Recent and Frequent tags as Add actions, then `New Tag…`. It stays open after each change so several tags can be edited in one visit. A clean installation starts with the `favorite` tag assigned to `★`; removing it remains persistent. Reset Usage History asks for confirmation before clearing recency, frequency, and replay history.
 
@@ -152,9 +169,14 @@ Any name or custom-tag suggestion supported by only one remaining glyph is omitt
 
 Choose `Output Format…` to insert glyphs as Unicode escapes, code-point references, names, details, HTML entities, or bitmap text. Use `\u*query` for the configured bitmap format, or select existing text and run `Pretty Print`, `Pretty Print…`, or `Pretty Print*…` for progressively more control.
 
-| Lion | Phoenix |
-| --- | --- |
-| ![A lion rendered with colored Pretty Print output](https://images.squarespace-cdn.com/content/v1/680437d9e2a0b76194d51373/95bc0062-7e39-4384-b98d-94da2fdc6bea/Screenshot+2026-09-08+at+9.16.26%E2%80%AFPM.png?format=1500w) | ![A phoenix rendered with colored Pretty Print output](https://images.squarespace-cdn.com/content/v1/680437d9e2a0b76194d51373/bb8bec72-254c-44da-bceb-fa89e972ed77/Screenshot+2026-09-08+at+11.39.50%E2%80%AFPM.png?format=1000w) |
+Pretty Print uses the fonts already installed on your machine, preserves complete emoji grapheme clusters, and can rotate, mirror, wrap, compact, and redirect output without sending editor content to a service.
+
+## Tip Jar
+
+If YouHaveCode saves you from another tab spiral through Unicode charts, search engines, missing-glyph boxes, emoji tables, and copy-paste limbo, you can help fund the next round of polish. Tips support Unicode data updates, platform compatibility profiles, font coverage scans, Pretty Print rendering work, and release packaging.
+
+- Venmo: [@neonash777](https://venmo.com/neonash777)
+- Cash App: [$neonash777](https://cash.app/$neonash777)
 
 ## Advanced And Technical
 

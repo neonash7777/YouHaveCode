@@ -27,8 +27,8 @@
 - Regenerate `RELEASE_INTEGRITY.json` after the final docs/data/build changes;
    it is expected to change whenever `CHANGELOG.md`, `README.md`, bundled data,
    or `dist/extension.js` changes.
-- Decide whether version `0.0.1` is the intended first public version or bump to
-   `0.1.0` before packaging.
+- Confirm `package.json`, `package-lock.json`, and `CHANGELOG.md` use the intended
+   release version before packaging.
 
 ## Legal and provenance
 
@@ -45,26 +45,29 @@
 ## Build and integrity
 
 1. Install from the lockfile with `npm ci` on the target platform.
-2. Run `npm run release:prepare`. This builds production output, writes
+2. Run the extension test suite against the declared minimum and current stable
+   VS Code versions on Windows x64, Linux x64, macOS Intel, and macOS Apple
+   Silicon. The platform workflow performs this gate before packaging.
+3. Run `npm run release:prepare`. This builds production output, writes
    `RELEASE_INTEGRITY.json`, and verifies every recorded SHA-256 digest.
-3. Review the manifest's version, data provenance, legal files, compiled bundle,
+4. Review the manifest's version, data provenance, legal files, compiled bundle,
    data files, lockfile, and native binary.
-4. Package a platform-specific VSIX, for example:
+5. Package a platform-specific VSIX, for example:
 
    ```bash
    npx @vscode/vsce package --target darwin-arm64
    ```
 
-5. Hash the final artifact:
+6. Hash the final artifact:
 
    ```bash
    npm run integrity:artifact -- ./youhavecode-darwin-arm64.vsix
    ```
 
-6. Inspect the VSIX and confirm it contains `LICENSE`,
+7. Inspect the VSIX and confirm it contains `LICENSE`,
    `THIRD_PARTY_NOTICES.md`, `RELEASE_INTEGRITY.json`, all bundled data files, and
    only the intended platform's native Canvas binary.
-7. Retain the VSIX, its `.sha256` sidecar, and the integrity manifest with the
+8. Retain the VSIX, its `.sha256` sidecar, and the integrity manifest with the
    release record. Publish the checksum in a trusted release channel or signed
    tag; a checksum stored only beside a compromised artifact does not establish
    authenticity.

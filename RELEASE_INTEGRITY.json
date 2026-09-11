@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "package": "youhavecode",
-  "version": "0.0.1",
-  "generatedAt": "2026-09-09T07:31:28.154Z",
+  "version": "0.0.2",
+  "generatedAt": "2026-09-11T22:24:24.020Z",
   "algorithm": "sha256",
   "dataProvenance": {
     "unicode": {
@@ -18,8 +18,8 @@
   "files": [
     {
       "path": "CHANGELOG.md",
-      "bytes": 3180,
-      "sha256": "aea0de6407177c8866261a526d45b3ec38fe977b71c145854b79b9f6dfd1549a"
+      "bytes": 3811,
+      "sha256": "a8a509586acd48cd95b267976dbd5e81a6deefaf206e7bf5a8536aba0d20a045"
     },
     {
       "path": "COMPATIBILITY_COVERAGE.md",
@@ -38,13 +38,13 @@
     },
     {
       "path": "README.md",
-      "bytes": 25936,
-      "sha256": "c627f0493ca82db28115fc9af2067ceb14a3e4b5a9f3cab6a73e70303d6ddef1"
+      "bytes": 26956,
+      "sha256": "44eecdd799fb8c1e95a718c877fb7e0fe29da9a0a9948e6a92d28dce4d9fc874"
     },
     {
       "path": "RELEASE_CHECKLIST.md",
-      "bytes": 3521,
-      "sha256": "7ee54614ead89bd2dbfafe1821c3364627a1f0ba737dd3711acc216280dec1cf"
+      "bytes": 3758,
+      "sha256": "7e3a9aef1be574c5872b1b899213fb4ee5bdee11ef02b29764cb353b7d92fe42"
     },
     {
       "path": "THIRD_PARTY_NOTICES.md",
@@ -73,23 +73,23 @@
     },
     {
       "path": "dist/extension.js",
-      "bytes": 168546,
-      "sha256": "c6f20e247066b5fc74f0c5a0e80c88358103f6a0638f73162dab179eb958d90f"
+      "bytes": 168594,
+      "sha256": "ef53b03eb4eb083f5d5ff8a1d4bd088dd3dbda75014028be2e1c994754ad639e"
     },
     {
       "path": "node_modules/@napi-rs/canvas-darwin-arm64/skia.darwin-arm64.node",
-      "bytes": 27107936,
-      "sha256": "5f5cc59009b800f9507f33862b742033529219107e8fd8ddfb9fbdfade4eba1f"
+      "bytes": 27953136,
+      "sha256": "d88cb94e049adb94980449461a155bc849cd4889a870434a1059d28f26612aec"
     },
     {
       "path": "package-lock.json",
       "bytes": 205964,
-      "sha256": "17fca6e7800516a008c7a51bff8205e897def6da4a109a91a121c458ffcd223b"
+      "sha256": "85cbfde52bc0910b37fbda81e7ab1061a44ce253da0ac3dfe356d79e4445aec9"
     },
     {
       "path": "package.json",
-      "bytes": 34960,
-      "sha256": "df41ca5b1a25261921dcf6d37514cd6e7a0137aa150bafb91377c412357ecdf7"
+      "bytes": 34961,
+      "sha256": "cb088120b417775192753661874e8239ef51c72a39cfb904d7af702c465e7027"
     },
     {
       "path": "scripts/release-integrity.mjs",

@@ -60,10 +60,14 @@ export class UnicodeSidebarProvider implements vscode.TreeDataProvider<UnicodeSi
 
  async getChildren(item?: UnicodeSidebarItem): Promise<UnicodeSidebarItem[]> {
   if (!item) {
+   const currentOutput = outputLabel(this.source.output?.() ?? 'glyph');
+   const outputFormat = group('Output Format', `Currently set to ${currentOutput}`, 'symbol-string', 'outputFormat');
+   outputFormat.description = currentOutput;
    return [
         action('Search and Insert', undefined, 'search', 'youhavecode.insertGlyph'),
     group('Recent', 'Recently inserted glyphs', 'history', 'recent'),
     group('Frequent', 'Most-used glyphs', 'graph', 'frequent'),
+  outputFormat,
         group('Tags', 'Search and assign custom tags', 'tag', 'tags'),
         group('Properties', 'Search Unicode properties', 'symbol-property', 'properties'),
       group('Unicode Table', 'Browse every Unicode entry by block, page, row, and glyph', 'table', 'unicodeTable'),
@@ -221,7 +225,6 @@ export class UnicodeSidebarProvider implements vscode.TreeDataProvider<UnicodeSi
     }
   if (item.group === 'tools') {
    return [
-    group('Output Format', 'Choose inserted text or bitmap output', 'symbol-string', 'outputFormat'),
     group('Compatibility', 'Configure platform versions and support policies', 'warning', 'compatibility'),
     action('Extension Settings…', 'Configure YouHaveCode', 'gear', 'workbench.action.openSettings', ['youhavecode']),
     action('Reset Usage History…', 'Clear recent and frequency rankings', 'clear-all', 'youhavecode.resetUsageHistory'),
