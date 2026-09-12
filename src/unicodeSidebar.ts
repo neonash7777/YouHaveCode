@@ -1,11 +1,11 @@
 import * as vscode from 'vscode';
 import { filterKeys, outputValues, type DefaultFilterConfig, type FilterKey } from './unicodeCompletions';
-import { compatibilityTargets, type CompatibilityFallbackPolicy, type CompatibilityTarget, type CompatibilityTargetSettings } from './compatibilitySettings';
+import { compatibilityTargets, fallbackCompatibilityProfiles, getTargetCodicon, getTargetSymbol, normalizePolicy, unsupportedGlyphCount, type CompatibilityBadgeStyle, type CompatibilityFallbackPolicy, type CompatibilityProfiles, type CompatibilityTarget, type CompatibilityTargetSettings } from './compatibilitySettings';
 import type { UnicodeEntry } from './unicodeData';
 import { applyEmojiPresentation, type EmojiPresentation } from './unicodeDeconstruction';
 import { parseGlyphVariantKey, rankGlyphVariants, type UsageStats } from './usageRanking';
 
-type SidebarGroup = 'recent' | 'frequent' | 'tags' | 'properties' | 'unicodeTable' | 'unicodeTableBlock' | 'unicodeTableSubBlock' | 'unicodeTableRow' | 'prettyPrint' | 'prettyPrintOutput' | 'prettyPrintSize' | 'prettyPrintWrap' | 'prettyPrintSpacing' | 'prettyPrintMapping' | 'prettyPrintFlow' | 'prettyPrintWrapDirection' | 'prettyPrintTransform' | 'prettyPrintFormats' | 'prettyPrintSettings' | 'prettyPrintDebug' | 'prettyPrintType' | 'prettyPrintFontFamilies' | 'prettyPrintFontActive' | 'prettyPrintFontInstalled' | 'prettyPrintFontBucket' | 'tools' | 'outputFormat' | 'defaultFilters' | 'compatibility' | 'compatibilityTarget' | 'compatibilityFallback';
+type SidebarGroup = 'recent' | 'frequent' | 'tags' | 'properties' | 'unicodeTable' | 'unicodeTableBlock' | 'unicodeTableSubBlock' | 'unicodeTableRow' | 'prettyPrint' | 'prettyPrintOutput' | 'prettyPrintSize' | 'prettyPrintWrap' | 'prettyPrintSpacing' | 'prettyPrintMapping' | 'prettyPrintFlow' | 'prettyPrintWrapDirection' | 'prettyPrintTransform' | 'prettyPrintFormats' | 'prettyPrintSettings' | 'prettyPrintDebug' | 'prettyPrintType' | 'prettyPrintFontFamilies' | 'prettyPrintFontActive' | 'prettyPrintFontInstalled' | 'prettyPrintFontBucket' | 'tools' | 'outputFormat' | 'defaultFilters' | 'compatibility' | 'compatibilityTarget' | 'compatibilityFallback' | 'compatibilityBadgeStyle';
 type PrettyPrintSetting = 'output' | 'size' | 'wrap' | 'compact' | 'mapping' | 'flow' | 'wrap-direction' | 'd4';
 
 export interface UnicodeSidebarSource {
@@ -20,6 +20,7 @@ export interface UnicodeSidebarSource {
  defaultFilters?(): DefaultFilterConfig;
  defaultTerms?(): readonly string[];
  disabledDefaults?(): readonly string[];
+ disabledTableNodes?(): readonly string[];
  output?(): string;
  prettyPrintDefaults?(): Readonly<Record<PrettyPrintSetting, string>>;
  prettyPrintFontFamilies?(): { active: readonly string[]; available: readonly string[] };
@@ -27,15 +28,25 @@ export interface UnicodeSidebarSource {
  editorWrap?(): string;
  d4Icon?(operation: string): vscode.IconPath | undefined;
  directionIcon?(direction: string, paired?: boolean): vscode.IconPath | undefined;
- compatibility?(): { targets: CompatibilityTargetSettings; unknown: CompatibilityFallbackPolicy; localFont: CompatibilityFallbackPolicy };
+  platformIcon?(target: CompatibilityTarget): vscode.IconPath | undefined;
+  compatibility?(): { targets: CompatibilityTargetSettings; unknown: CompatibilityFallbackPolicy; localFont: CompatibilityFallbackPolicy; badgeStyle: CompatibilityBadgeStyle };
+  compatibilityProfiles?(): Promise<CompatibilityProfiles>;
+  renderGlyphOutput?(hex: string, presentation?: EmojiPresentation): Promise<string>;
 }
-
-export class UnicodeSidebarProvider implements vscode.TreeDataProvider<UnicodeSidebarItem> {
+export class UnicodeSidebarProvider implements vscode.TreeDataProvider<UnicodeSidebarItem>, vscode.TreeDragAndDropController<UnicodeSidebarItem> {
+ readonly dropMimeTypes: readonly string[] = [];
+ readonly dragMimeTypes: readonly string[] = ['text/plain'];
  private readonly changed = new vscode.EventEmitter<UnicodeSidebarItem | UnicodeSidebarItem[] | undefined>();
  private readonly prettyPrintHeaders = new Map<PrettyPrintSetting, UnicodeSidebarItem>();
  readonly onDidChangeTreeData = this.changed.event;
 
  constructor(private readonly source: UnicodeSidebarSource) {}
+
+ async handleDrag(source: readonly UnicodeSidebarItem[], dataTransfer: vscode.DataTransfer): Promise<void> {
+  const outputs = await Promise.all(source.flatMap(item => item.hex ? [this.source.renderGlyphOutput?.(item.hex, item.presentation) ?? Promise.resolve('')] : []));
+  const text = outputs.filter(Boolean).join('');
+  if (text) { dataTransfer.set('text/plain', new vscode.DataTransferItem(text)); }
+ }
 
  refresh(): void { this.changed.fire(undefined); }
  refreshPrettyPrintSetting(setting: PrettyPrintSetting): void {
@@ -105,13 +116,15 @@ export class UnicodeSidebarProvider implements vscode.TreeDataProvider<UnicodeSi
      ));
     }
   if (item.group === 'unicodeTable') {
-   return tableBlocks(await this.source.entries());
+   const disabled = new Set(this.source.disabledTableNodes?.() ?? []);
+   return tableBlocks(await this.source.entries(), disabled);
   }
   if (item.group === 'unicodeTableBlock' || item.group === 'unicodeTableSubBlock' || item.group === 'unicodeTableRow') {
+   const disabled = new Set(this.source.disabledTableNodes?.() ?? []);
    const entries = (await this.source.entries()).filter(entry => item.tableBlock === undefined || entry.block === item.tableBlock)
     .filter(entry => item.tableStart === undefined || item.tableEnd === undefined || between(entryCodepoint(entry), item.tableStart, item.tableEnd));
-   if (item.group === 'unicodeTableBlock') { return tableRanges(entries, 'unicodeTableSubBlock', 0x100); }
-   if (item.group === 'unicodeTableSubBlock') { return tableRanges(entries, 'unicodeTableRow', 0x10); }
+   if (item.group === 'unicodeTableBlock') { return tableRanges(entries, 'unicodeTableSubBlock', 0x100, disabled); }
+   if (item.group === 'unicodeTableSubBlock') { return tableRanges(entries, 'unicodeTableRow', 0x10, disabled); }
    return Promise.all(entries.sort(compareEntriesByCodepoint).map(entry => glyphs(entry, undefined, false, undefined, undefined, resolvePresentation(undefined, this.source.emojiPresentation?.()), this.source.textGlyphIcon))).then(items => items.flat());
   }
   if (item.group === 'prettyPrint') {
@@ -261,24 +274,45 @@ export class UnicodeSidebarProvider implements vscode.TreeDataProvider<UnicodeSi
   if (item.group === 'compatibility') {
    const configured = this.source.compatibility?.();
    if (!configured) { return []; }
-  return [
-   ...compatibilityTargets.map(({ key, label }) => {
-    const targetItem = nested(`${label} · ${configured.targets[key].version} · ${configured.targets[key].policy}`, 'server-environment', 'compatibilityTarget', { target: key });
-    targetItem.id = `youhavecode.group.compatibilityTarget.${key}`;
-    return targetItem;
-   }),
-   (() => { const fallback = nested(`Unknown Evidence · ${configured.unknown}`, 'question', 'compatibilityFallback', { fallback: 'unknown' }); fallback.id = 'youhavecode.group.compatibilityFallback.unknown'; return fallback; })(),
-  (() => { const fallback = nested(`Local Font · ${configured.localFont}`, 'text-size', 'compatibilityFallback', { fallback: 'localFont' }); fallback.id = 'youhavecode.group.compatibilityFallback.localFont'; return fallback; })(),
-   action('Reset Defaults', 'Restore current versions and warning policies', 'discard', 'youhavecode.resetCompatibility'),
-  ];
+   const [entries, profiles] = await Promise.all([this.source.entries(), this.source.compatibilityProfiles?.() ?? Promise.resolve(fallbackCompatibilityProfiles)]);
+   return [
+    action('Presets…', 'Set all platform policies (Enforce All, Warn All, Dismiss All, Current Platform, Desktop OS, Typical Consumer Stack)', 'layers', 'youhavecode.setCompatibilityPreset'),
+    ...compatibilityTargets.map(({ key, label }) => {
+     const symbol = getTargetSymbol(key);
+     const codicon = getTargetCodicon(key);
+     const policy = normalizePolicy(configured.targets[key]?.policy);
+     const count = unsupportedGlyphCount(entries, key, profiles, configured.targets[key]?.version);
+      const targetItem = nested(label, codicon, 'compatibilityTarget', { target: key });
+     targetItem.iconPath = this.source.platformIcon?.(key) ?? targetItem.iconPath;
+     targetItem.description = `${policy} · -${count} glyph${count === 1 ? '' : 's'}`;
+     targetItem.id = `youhavecode.group.compatibilityTarget.${key}`;
+     return targetItem;
+    }),
+    (() => {
+     const styleItem = nested(`Badge Style · ${configured.badgeStyle}`, 'symbol-enum', 'compatibilityBadgeStyle', {});
+     styleItem.id = 'youhavecode.group.compatibilityBadgeStyle';
+     return styleItem;
+    })(),
+    (() => { const fallback = nested(`Unknown Evidence · ${configured.unknown}`, 'question', 'compatibilityFallback', { fallback: 'unknown' }); fallback.id = 'youhavecode.group.compatibilityFallback.unknown'; return fallback; })(),
+    (() => { const fallback = nested(`Local Font · ${configured.localFont}`, 'text-size', 'compatibilityFallback', { fallback: 'localFont' }); fallback.id = 'youhavecode.group.compatibilityFallback.localFont'; return fallback; })(),
+    action('Reset Defaults', 'Restore current versions and warning policies', 'discard', 'youhavecode.resetCompatibility'),
+   ];
+  }
+  if (item.group === 'compatibilityBadgeStyle') {
+   const currentStyle = this.source.compatibility?.().badgeStyle;
+   return [
+    action('Symbol (🍎/)', 'Use emoji symbols for badges', currentStyle === 'symbol' ? 'check' : 'circle-outline', 'youhavecode.setCompatibilityBadgeStyle', ['symbol']),
+    action('Letter (Mac)', 'Use letter abbreviations for badges', currentStyle === 'letter' ? 'check' : 'circle-outline', 'youhavecode.setCompatibilityBadgeStyle', ['letter']),    action('Product Icons', 'Use VS Code product icons for badges', currentStyle === 'icon' ? 'check' : 'circle-outline', 'youhavecode.setCompatibilityBadgeStyle', ['icon']),   ];
   }
   if (item.group === 'compatibilityTarget' && item.target) {
-   const current = this.source.compatibility?.().targets[item.target];
-   if (!current) { return []; }
+   const current = normalizePolicy(this.source.compatibility?.().targets[item.target]?.policy);
+   const [entries, profiles] = await Promise.all([this.source.entries(), this.source.compatibilityProfiles?.() ?? Promise.resolve(fallbackCompatibilityProfiles)]);
+   const count = unsupportedGlyphCount(entries, item.target, profiles, this.source.compatibility?.().targets[item.target]?.version);
+   const lossText = `-${count} glyph${count === 1 ? '' : 's'}`;
    return [
-    ...(['required', 'warn', 'permitted', 'blocked'] as const).map(policy => action(`Policy: ${policy}`, `Set ${item.target} policy`, policy === current.policy ? 'check' : 'shield', 'youhavecode.setCompatibilityTargetPolicy', [item.target, policy])),
-    ...(['current', 'any'] as const).map(version => action(`Version: ${version}`, `Set ${item.target} version`, version === current.version ? 'check' : 'versions', 'youhavecode.setCompatibilityTargetVersion', [item.target, version])),
-    action('Version: Pin…', 'Enter a specific platform version', 'pin', 'youhavecode.pinCompatibilityTargetVersion', [item.target]),
+    action('Enforced (Must have glyph)', `Unlist unsupported glyphs (${lossText})`, current === 'enforced' ? 'check' : 'shield', 'youhavecode.setCompatibilityTargetPolicy', [item.target, 'enforced']),
+    action('Warned (Show badge)', `Warn when missing (${lossText})`, current === 'warned' ? 'check' : 'shield', 'youhavecode.setCompatibilityTargetPolicy', [item.target, 'warned']),
+    action('Dismissed (Disregard)', 'Disregard support checks', current === 'dismissed' ? 'check' : 'shield', 'youhavecode.setCompatibilityTargetPolicy', [item.target, 'dismissed']),
    ];
   }
   if (item.group === 'compatibilityFallback' && item.fallback) {
@@ -321,6 +355,7 @@ export class UnicodeSidebarItem extends vscode.TreeItem {
  tableBlock?: string;
  tableStart?: number;
  tableEnd?: number;
+ tableNodeKey?: string;
  constructor(label: string, state: vscode.TreeItemCollapsibleState, readonly group?: SidebarGroup) { super(label, state); }
 }
 
@@ -340,34 +375,44 @@ const nested = (label: string, icon: string, value: SidebarGroup, metadata: { ta
  return item;
 };
 
-const tableBlocks = (entries: readonly UnicodeEntry[]) => {
+const tableBlocks = (entries: readonly UnicodeEntry[], disabledNodes: ReadonlySet<string>) => {
  const blocks = new Map<string, UnicodeEntry[]>();
  entries.forEach(entry => blocks.set(entry.block, [...(blocks.get(entry.block) ?? []), entry]));
  return [...blocks.entries()].sort(([, left], [, right]) => entryCodepoint(left[0]) - entryCodepoint(right[0])).map(([block, blockEntries]) => {
   const sorted = blockEntries.sort(compareEntriesByCodepoint);
-  return tableNode(block, `${rangeLabel(entryCodepoint(sorted[0]), entryCodepoint(sorted.at(-1)!))} · ${blockEntries.length.toLocaleString()} glyph${blockEntries.length === 1 ? '' : 's'}`, 'symbol-class', 'unicodeTableBlock', block, entryCodepoint(sorted[0]), entryCodepoint(sorted.at(-1)!));
+  return tableNode(block, `${rangeLabel(entryCodepoint(sorted[0]), entryCodepoint(sorted.at(-1)!))} · ${blockEntries.length.toLocaleString()} glyph${blockEntries.length === 1 ? '' : 's'}`, 'symbol-class', 'unicodeTableBlock', block, entryCodepoint(sorted[0]), entryCodepoint(sorted.at(-1)!), disabledNodes);
  });
 };
 
-const tableRanges = (entries: readonly UnicodeEntry[], group: 'unicodeTableSubBlock' | 'unicodeTableRow', size: number) => {
+const tableRanges = (entries: readonly UnicodeEntry[], group: 'unicodeTableSubBlock' | 'unicodeTableRow', size: number, disabledNodes: ReadonlySet<string>) => {
  const ranges = new Map<number, UnicodeEntry[]>();
  entries.forEach(entry => {
   const start = Math.floor(entryCodepoint(entry) / size) * size;
   ranges.set(start, [...(ranges.get(start) ?? []), entry]);
  });
- return [...ranges.entries()].sort(([left], [right]) => left - right).map(([start, rangeEntries]) => {
-  const sorted = rangeEntries.sort(compareEntriesByCodepoint);
+ const rangeEntries = [...ranges.entries()].sort(([left], [right]) => left - right);
+ if (rangeEntries.length === 1 && group === 'unicodeTableSubBlock') {
+  const [start, subEntries] = rangeEntries[0];
+  return tableRanges(subEntries, 'unicodeTableRow', 0x10, disabledNodes);
+ }
+ return rangeEntries.map(([start, rEntries]) => {
+  const sorted = rEntries.sort(compareEntriesByCodepoint);
   const end = start + size - 1;
-  return tableNode(rangeLabel(start, end), `${rangeEntries.length.toLocaleString()} glyph${rangeEntries.length === 1 ? '' : 's'} · ${sorted[0].name}..${sorted.at(-1)!.name}`, group === 'unicodeTableRow' ? 'symbol-numeric' : 'symbol-array', group, sorted[0].block, start, end);
+  const nameDesc = sorted[0].name === sorted.at(-1)!.name ? sorted[0].name : `${sorted[0].name}..${sorted.at(-1)!.name}`;
+  return tableNode(rangeLabel(start, end), `${rEntries.length.toLocaleString()} glyph${rEntries.length === 1 ? '' : 's'} · ${nameDesc}`, group === 'unicodeTableRow' ? 'symbol-numeric' : 'symbol-array', group, sorted[0].block, start, end, disabledNodes);
  });
 };
 
-const tableNode = (label: string, description: string, icon: string, group: 'unicodeTableBlock' | 'unicodeTableSubBlock' | 'unicodeTableRow', block: string, start: number, end: number) => {
+const tableNode = (label: string, description: string, defaultIcon: string, group: 'unicodeTableBlock' | 'unicodeTableSubBlock' | 'unicodeTableRow', block: string, start: number, end: number, disabledNodes: ReadonlySet<string>) => {
  const item = new UnicodeSidebarItem(label, vscode.TreeItemCollapsibleState.Collapsed, group);
- item.id = `youhavecode.table.${group}.${block}.${start.toString(16)}.${end.toString(16)}`;
- item.description = description;
- item.tooltip = `${label}, ${description}`;
- item.iconPath = new vscode.ThemeIcon(icon);
+ const id = `youhavecode.table.${group}.${block}.${start.toString(16)}.${end.toString(16)}`;
+ const nodeKey = `${group}:${block}:${start.toString(16)}:${end.toString(16)}`;
+ const isDisabled = disabledNodes.has(nodeKey);
+ item.id = id;
+ item.tableNodeKey = nodeKey;
+ item.description = isDisabled ? `Disabled · ${description}` : description;
+ item.tooltip = isDisabled ? `${label} (Disabled), ${description}` : `${label}, ${description}`;
+ item.iconPath = new vscode.ThemeIcon(isDisabled ? 'circle-slash' : defaultIcon, isDisabled ? new vscode.ThemeColor('disabledForeground') : undefined);
  item.contextValue = `youhavecode.group.${group}`;
  item.tableBlock = block;
  item.tableStart = start;

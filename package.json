@@ -140,13 +140,34 @@
           "default": {},
           "additionalProperties": false,
           "properties": {
-            "bidi": { "type": "string", "description": "Default bidirectional-class filter, including OR or negated values such as R|AL or !L." },
-            "category": { "type": "string", "description": "Default Unicode general-category filter." },
-            "combining": { "type": "string", "description": "Default canonical combining-class filter." },
-            "decomp": { "type": "string", "description": "Default decomposition-type filter." },
-            "lang": { "type": "string", "description": "Default language or script-family filter." },
-            "block": { "type": "string", "description": "Default Unicode block filter." },
-            "emoji": { "type": "string", "description": "Default emoji-presentation filter: COLOR, TEXT, or NONE." }
+            "bidi": {
+              "type": "string",
+              "description": "Default bidirectional-class filter, including OR or negated values such as R|AL or !L."
+            },
+            "category": {
+              "type": "string",
+              "description": "Default Unicode general-category filter."
+            },
+            "combining": {
+              "type": "string",
+              "description": "Default canonical combining-class filter."
+            },
+            "decomp": {
+              "type": "string",
+              "description": "Default decomposition-type filter."
+            },
+            "lang": {
+              "type": "string",
+              "description": "Default language or script-family filter."
+            },
+            "block": {
+              "type": "string",
+              "description": "Default Unicode block filter."
+            },
+            "emoji": {
+              "type": "string",
+              "description": "Default emoji-presentation filter: COLOR, TEXT, or NONE."
+            }
           },
           "description": "Property filters applied to every Unicode search. An explicit query filter with the same key replaces its default."
         },
@@ -154,48 +175,245 @@
           "type": "array",
           "default": [],
           "uniqueItems": true,
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Name words and custom tags applied to every Unicode search. These terms accumulate."
         },
         "youhavecode.disabledDefaultItems": {
           "type": "array",
           "default": [],
           "uniqueItems": true,
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Configured default property filters and search terms currently disabled in the sidebar."
+        },
+        "youhavecode.disabledTableNodes": {
+          "type": "array",
+          "default": [],
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          },
+          "description": "Configured Unicode table blocks or range nodes disabled in the sidebar."
         },
         "youhavecode.compatibilityTargets": {
           "type": "object",
           "additionalProperties": false,
           "default": {
-            "ios": { "version": "current", "policy": "warn" },
-            "android-aosp": { "version": "current", "policy": "warn" },
-            "macos": { "version": "current", "policy": "warn" },
-            "windows": { "version": "current", "policy": "warn" },
-            "ubuntu": { "version": "current", "policy": "warn" }
+            "ios": {
+              "policy": "warned"
+            },
+            "android-aosp": {
+              "policy": "warned"
+            },
+            "macos": {
+              "policy": "warned"
+            },
+            "windows": {
+              "policy": "warned"
+            },
+            "ubuntu": {
+              "policy": "warned"
+            }
           },
           "properties": {
-            "ios": { "type": "object", "additionalProperties": false, "properties": { "version": { "type": "string", "default": "current" }, "policy": { "type": "string", "enum": ["required", "warn", "permitted", "blocked"], "default": "warn" } }, "required": ["version", "policy"], "description": "Apple iOS base-install compatibility profile." },
-            "android-aosp": { "type": "object", "additionalProperties": false, "properties": { "version": { "type": "string", "default": "current" }, "policy": { "type": "string", "enum": ["required", "warn", "permitted", "blocked"], "default": "warn" } }, "required": ["version", "policy"], "description": "Android Open Source Project base-install compatibility profile; OEM fonts may differ." },
-            "macos": { "type": "object", "additionalProperties": false, "properties": { "version": { "type": "string", "default": "current" }, "policy": { "type": "string", "enum": ["required", "warn", "permitted", "blocked"], "default": "warn" } }, "required": ["version", "policy"], "description": "Apple macOS base-install compatibility profile." },
-            "windows": { "type": "object", "additionalProperties": false, "properties": { "version": { "type": "string", "default": "current" }, "policy": { "type": "string", "enum": ["required", "warn", "permitted", "blocked"], "default": "warn" } }, "required": ["version", "policy"], "description": "Microsoft Windows base-install compatibility profile." },
-            "ubuntu": { "type": "object", "additionalProperties": false, "properties": { "version": { "type": "string", "default": "current" }, "policy": { "type": "string", "enum": ["required", "warn", "permitted", "blocked"], "default": "warn" } }, "required": ["version", "policy"], "description": "Ubuntu base-install compatibility profile; Linux distributions differ." }
+            "ios": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "version": {
+                  "type": "string",
+                  "default": "current"
+                },
+                "policy": {
+                  "type": "string",
+                  "enum": [
+                    "enforced",
+                    "warned",
+                    "dismissed",
+                    "required",
+                    "warn",
+                    "permitted",
+                    "blocked"
+                  ],
+                  "default": "warned"
+                }
+              },
+              "required": [
+                "policy"
+              ],
+              "description": "Apple iOS compatibility policy."
+            },
+            "android-aosp": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "version": {
+                  "type": "string",
+                  "default": "current"
+                },
+                "policy": {
+                  "type": "string",
+                  "enum": [
+                    "enforced",
+                    "warned",
+                    "dismissed",
+                    "required",
+                    "warn",
+                    "permitted",
+                    "blocked"
+                  ],
+                  "default": "warned"
+                }
+              },
+              "required": [
+                "policy"
+              ],
+              "description": "Android Open Source Project compatibility policy."
+            },
+            "macos": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "version": {
+                  "type": "string",
+                  "default": "current"
+                },
+                "policy": {
+                  "type": "string",
+                  "enum": [
+                    "enforced",
+                    "warned",
+                    "dismissed",
+                    "required",
+                    "warn",
+                    "permitted",
+                    "blocked"
+                  ],
+                  "default": "warned"
+                }
+              },
+              "required": [
+                "policy"
+              ],
+              "description": "Apple macOS compatibility policy."
+            },
+            "windows": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "version": {
+                  "type": "string",
+                  "default": "current"
+                },
+                "policy": {
+                  "type": "string",
+                  "enum": [
+                    "enforced",
+                    "warned",
+                    "dismissed",
+                    "required",
+                    "warn",
+                    "permitted",
+                    "blocked"
+                  ],
+                  "default": "warned"
+                }
+              },
+              "required": [
+                "policy"
+              ],
+              "description": "Microsoft Windows compatibility policy."
+            },
+            "ubuntu": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "version": {
+                  "type": "string",
+                  "default": "current"
+                },
+                "policy": {
+                  "type": "string",
+                  "enum": [
+                    "enforced",
+                    "warned",
+                    "dismissed",
+                    "required",
+                    "warn",
+                    "permitted",
+                    "blocked"
+                  ],
+                  "default": "warned"
+                }
+              },
+              "required": [
+                "policy"
+              ],
+              "description": "Ubuntu Linux compatibility policy."
+            }
           },
-          "description": "Versioned platform compatibility policies. Missing target entries inherit current + warn. Profiles configure future support verdicts; they do not claim coverage without bundled evidence."
+          "description": "Platform compatibility policies: enforced (must have glyph), warned (show badge when missing), or dismissed (disregard)."
         },
         "youhavecode.compatibilityUnknownPolicy": {
           "type": "string",
-          "enum": ["warn", "permitted", "unlist"],
-          "enumDescriptions": ["Keep the glyph and warn when evidence is unavailable.", "Keep the glyph without a warning.", "Remove glyphs without reliable compatibility evidence."],
+          "enum": [
+            "warn",
+            "permitted",
+            "unlist"
+          ],
+          "enumDescriptions": [
+            "Keep the glyph and warn when evidence is unavailable.",
+            "Keep the glyph without a warning.",
+            "Remove glyphs without reliable compatibility evidence."
+          ],
           "default": "warn",
           "description": "Behavior when the bundled compatibility data has no reliable verdict. Unknown is distinct from unsupported."
         },
         "youhavecode.compatibilityLocalFontPolicy": {
           "type": "string",
-          "enum": ["warn", "permitted", "unlist"],
-          "enumDescriptions": ["Keep the glyph and warn when no installed font can render it.", "Keep the glyph without a warning.", "Remove glyphs that no installed font can render."],
+          "enum": [
+            "warn",
+            "permitted",
+            "unlist"
+          ],
+          "enumDescriptions": [
+            "Keep the glyph and warn when no installed font can render it.",
+            "Keep the glyph without a warning.",
+            "Remove glyphs that no installed font can render."
+          ],
           "default": "warn",
           "description": "Behavior when the local system-font probe cannot render a glyph. Custom fonts may provide additional coverage."
+        },
+        "youhavecode.compatibilityBadgeStyle": {
+          "type": "string",
+          "enum": [
+            "symbol",
+            "letter",
+            "icon"
+          ],
+          "enumDescriptions": [
+            "Use emoji symbols for compatibility badges (e.g. 🍎️, 🪟️, 🐧️, 🤖️, 📲️).",
+            "Use platform letter abbreviations for compatibility badges (e.g. Ap, Wi, Li, An, iO).",
+            "Use VS Code Product Icons ($(icon)) for compatibility badges."
+          ],
+          "default": "symbol",
+          "description": "Style used for platform compatibility badges in completion items and details."
+        },
+        "youhavecode.compatibilityIndicatorMode": {
+          "type": "string",
+          "enum": [
+            "warnings",
+            "all"
+          ],
+          "enumDescriptions": [
+            "Only show a badge next to a glyph when at least one platform is warned or unsupported.",
+            "Always show every configured platform's status (supported ✓ or warned ⚠) next to each glyph."
+          ],
+          "default": "warnings",
+          "description": "Whether completion items show only what's missing (warnings) or the full per-platform compatibility status."
         },
         "youhavecode.bitmapSize": {
           "type": "integer",
@@ -218,8 +436,16 @@
         },
         "youhavecode.bitmapGlyphMapping": {
           "type": "string",
-          "enum": ["square", "baseline", "baseline-tight"],
-          "enumDescriptions": ["Normalize each glyph into a centered square raster.", "Preserve a common font baseline inside a fixed em box.", "Preserve the baseline while tightly sampling the typographic ascent and descent band."],
+          "enum": [
+            "square",
+            "baseline",
+            "baseline-tight"
+          ],
+          "enumDescriptions": [
+            "Normalize each glyph into a centered square raster.",
+            "Preserve a common font baseline inside a fixed em box.",
+            "Preserve the baseline while tightly sampling the typographic ascent and descent band."
+          ],
           "default": "baseline",
           "description": "Controls whether Pretty Print prioritizes square glyph shape or shared text baseline alignment."
         },
@@ -230,7 +456,9 @@
         },
         "youhavecode.prettyPrintFontFamilyDisabled": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "description": "Pretty Print font families disabled in the Font Precedence sidebar menu."
         },
@@ -668,6 +896,17 @@
         "command": "youhavecode.movePrettyPrintFontFamilyBottom",
         "title": "Move to Bottom",
         "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.toggleTableNode",
+        "title": "Enable / Disable Range",
+        "icon": "$(circle-slash)",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.setCompatibilityPreset",
+        "title": "Compatibility Preset…",
+        "category": "YouHaveCode"
       }
     ],
     "viewsContainers": {
@@ -841,6 +1080,11 @@
           "group": "2_clear"
         },
         {
+          "command": "youhavecode.toggleTableNode",
+          "when": "view == youhavecode.unicode && (viewItem == youhavecode.group.unicodeTableBlock || viewItem == youhavecode.group.unicodeTableSubBlock || viewItem == youhavecode.group.unicodeTableRow)",
+          "group": "inline@1"
+        },
+        {
           "command": "youhavecode.cycleSidebarTagConstraint",
           "when": "view == youhavecode.unicode && viewItem == youhavecode.tag",
           "group": "inline@1"
@@ -898,6 +1142,7 @@
   "scripts": {
     "vscode:prepublish": "npm run package",
     "sync-data": "node scripts/sync-data.mjs",
+    "generate-codicons": "node scripts/generate-codicons.mjs",
     "prepare:dev": "node scripts/run-dev.mjs --prepare-only",
     "prepare:dev:accessible": "node scripts/run-dev.mjs --accessible --prepare-only",
     "dev": "npm run compile && npm-run-all -p watch:build-delayed launch:dev",
@@ -926,6 +1171,7 @@
     "@types/mocha": "^10.0.10",
     "@types/node": "24.x",
     "@types/vscode": "^1.134.0",
+    "@vscode/codicons": "^0.0.46-24",
     "@vscode/test-cli": "^0.0.15",
     "@vscode/test-electron": "^3.0.0",
     "esbuild": "^0.28.1",

@@ -9,7 +9,7 @@ import { emptyUsageStats, orderFilterValues, rankCustomTags, rankGlyphHexes, rec
 import { bitmapSizeChoices, selectionOutputChoices } from '../extension';
 import { UnicodeSidebarProvider } from '../unicodeSidebar';
 import { resolveDelegateProfile } from '../delegateSandbox';
-import { compatibilitySummary, compatibilityWarningBadge, compatibilityWarningText, defaultCompatibilityTargets, emojiCompatibilityFindings, fontCoverageFindings, hasEmojiCompatibilityEvidence, parseCompatibilityProfiles, resolveCompatibilityTargets, unknownCompatibilityFindings, unknownCompatibilityWarningBadge, unknownCompatibilityWarningText } from '../compatibilitySettings';
+import { compatibilitySummary, compatibilityWarningBadge, compatibilityWarningText, defaultCompatibilityTargets, emojiCompatibilityFindings, fallbackCompatibilityProfiles, fontCoverageFindings, getTargetCodicon, getTargetSymbol, hasEmojiCompatibilityEvidence, parseCompatibilityProfiles, resolveCompatibilityTargets, unknownCompatibilityFindings, unknownCompatibilityWarningBadge, unknownCompatibilityWarningText } from '../compatibilitySettings';
 
 const sampleEntries = parseCompactUnicode([
  '0x,Name,Category,Bidi,Combining,Decomp,Lang,Block',
@@ -125,37 +125,54 @@ suite('Selection output menu', () => {
 });
 
 suite('Compatibility settings', () => {
- test('defaults every known current platform to warn', () => {
+ test('defaults every known current platform to warned', () => {
   const defaults = defaultCompatibilityTargets();
-  assert.deepStrictEqual(Object.values(defaults), Array.from({ length: 5 }, () => ({ version: 'current', policy: 'warn' })));
-  assert.strictEqual(compatibilitySummary(defaults, 'warn', 'warn'), '5/5 warn · unknown warn · local warn');
+  assert.deepStrictEqual(Object.values(defaults), Array.from({ length: 5 }, () => ({ version: 'current', policy: 'warned' })));
+  assert.strictEqual(compatibilitySummary(defaults, 'warn', 'warn'), '5 warned · 0 enforced · 0 dismissed');
  });
 
- test('fills omitted target fields from warn defaults', () => {
-  const configured = resolveCompatibilityTargets({ ios: { version: '18', policy: 'required' }, windows: { policy: 'permitted' } });
-  assert.deepStrictEqual(configured.ios, { version: '18', policy: 'required' });
-  assert.deepStrictEqual(configured.windows, { version: 'current', policy: 'permitted' });
-  assert.deepStrictEqual(configured['android-aosp'], { version: 'current', policy: 'warn' });
+ test('fills omitted target fields from warned defaults', () => {
+  const configured = resolveCompatibilityTargets({ ios: { policy: 'required' }, windows: { policy: 'dismissed' } });
+  assert.deepStrictEqual(configured.ios, { version: 'current', policy: 'enforced' });
+  assert.deepStrictEqual(configured.windows, { version: 'current', policy: 'dismissed' });
+  assert.deepStrictEqual(configured['android-aosp'], { version: 'current', policy: 'warned' });
  });
 
  test('reports platform-specific emoji compatibility warnings for pinned older targets', () => {
-  const targets = resolveCompatibilityTargets({ ios: { version: '17.0', policy: 'warn' }, macos: { version: '14.4', policy: 'warn' }, windows: { version: '11-24H2', policy: 'permitted' } });
+  const targets = resolveCompatibilityTargets({ ios: { version: '17.0', policy: 'warned' }, macos: { version: '14.4', policy: 'warned' }, windows: { version: '11-24H2', policy: 'dismissed' } });
   const findings = emojiCompatibilityFindings('E15.1', targets);
   const warning = compatibilityWarningText(findings);
-  assert.strictEqual(warning, 'iOS 17.0<17.4');
-  assert.strictEqual(compatibilityWarningBadge(findings), '(!Ap)');
+  assert.strictEqual(warning, 'iOS < 17.4');
+  assert.strictEqual(compatibilityWarningBadge(findings, fallbackCompatibilityProfiles, 'symbol'), '(!📱)');
+  assert.strictEqual(compatibilityWarningBadge(findings, fallbackCompatibilityProfiles, 'letter'), '(!iOS)');
   assert.strictEqual(hasEmojiCompatibilityEvidence('E15.1'), true);
   assert.strictEqual(hasEmojiCompatibilityEvidence(undefined), false);
-  assert.strictEqual(unknownCompatibilityWarningBadge('warn'), '(!?)');
+  assert.strictEqual(unknownCompatibilityWarningBadge('warn', 'symbol'), '(!❓)');
+  assert.strictEqual(unknownCompatibilityWarningBadge('warn', 'letter'), '(!?)');
   assert.strictEqual(unknownCompatibilityWarningText('warn'), 'No bundled platform evidence');
  });
 
+ test('resolves target platform symbols and codicons', () => {
+  assert.strictEqual(getTargetSymbol('macos', true), '');
+  assert.strictEqual(getTargetSymbol('macos', false), '🍎');
+  assert.strictEqual(getTargetSymbol('windows'), '⊞');
+  assert.strictEqual(getTargetSymbol('ubuntu'), '🐧');
+  assert.strictEqual(getTargetSymbol('android-aosp'), '🤖');
+  assert.strictEqual(getTargetSymbol('ios'), '📱');
+
+  assert.strictEqual(getTargetCodicon('macos'), 'desktop-download');
+  assert.strictEqual(getTargetCodicon('windows'), 'desktop-download');
+  assert.strictEqual(getTargetCodicon('ubuntu'), 'terminal-linux');
+  assert.strictEqual(getTargetCodicon('android-aosp'), 'device-mobile');
+  assert.strictEqual(getTargetCodicon('ios'), 'device-mobile');
+ });
+
  test('reports target-specific unknown compatibility evidence', () => {
-  const targets = resolveCompatibilityTargets({ macos: { version: 'current', policy: 'warn' } });
+  const targets = resolveCompatibilityTargets({ macos: { version: 'current', policy: 'warned' } });
   const profiles = parseCompatibilityProfiles(JSON.stringify({ schemaVersion: 1, emojiPlatformSupport: {}, fontCoverage: { macos: { current: { ranges: ['0000..10FFFF'] } } } }));
   const findings = unknownCompatibilityFindings(targets, profiles, 'warn');
-  assert.strictEqual(compatibilityWarningBadge(findings, profiles), '(!ApAnWiLi)');
-  assert.strictEqual(compatibilityWarningText(findings), 'iOS current no evidence, Android (AOSP) current no evidence, Windows current no evidence, Ubuntu current no evidence');
+  assert.strictEqual(compatibilityWarningBadge(findings, profiles, 'letter'), '(!WiLiiOSAn)');
+  assert.strictEqual(compatibilityWarningText(findings), 'Windows no evidence, Ubuntu no evidence, iOS no evidence, Android(AOSP) no evidence');
  });
 
  test('parses external compatibility profile documents', () => {
@@ -171,11 +188,12 @@ suite('Compatibility settings', () => {
  });
 
    test('reports platform font coverage misses from compact ranges', () => {
-    const targets = resolveCompatibilityTargets({ ios: { version: '17.0', policy: 'warn' } });
+    const targets = resolveCompatibilityTargets({ ios: { version: '17.0', policy: 'warned' } });
     const profiles = parseCompatibilityProfiles(JSON.stringify({ schemaVersion: 1, emojiPlatformSupport: {}, fontCoverage: { ios: { '17.0': { ranges: ['0000..007F'] } } } }));
     const findings = fontCoverageFindings([0x41, 0x203D], targets, profiles);
-    assert.strictEqual(compatibilityWarningBadge(findings, profiles), '(!Ap)');
-    assert.strictEqual(compatibilityWarningText(findings), 'iOS 17.0 missing font');
+    assert.strictEqual(compatibilityWarningBadge(findings, profiles, 'symbol'), '(!📱)');
+    assert.strictEqual(compatibilityWarningBadge(findings, profiles, 'letter'), '(!iOS)');
+    assert.strictEqual(compatibilityWarningText(findings), 'iOS missing font');
    });
 });
 
@@ -256,7 +274,8 @@ suite('Unicode sidebar', () => {
   prettyPrintFontFamilies: () => ({ active: ['Apple Symbols'], available: ['Apple Symbols', 'Noto Emoji', '123 Font'] }),
   d4Icon: operation => new vscode.ThemeIcon(`d4-${operation}`),
   directionIcon: (direction, paired) => new vscode.ThemeIcon(`${paired ? 'wrap' : 'flow'}-${direction}`),
-   compatibility: () => ({ targets: resolveCompatibilityTargets({ ios: { version: '18', policy: 'required' } }), unknown: 'warn', localFont: 'permitted' }),
+  platformIcon: target => new vscode.ThemeIcon(`platform-${target}`),
+   compatibility: () => ({ targets: resolveCompatibilityTargets({ ios: { version: '18', policy: 'required' } }), unknown: 'warn', localFont: 'permitted', badgeStyle: 'symbol' }),
   });
   const root = await provider.getChildren();
   assert.deepStrictEqual(root.map(item => item.label), ['Search and Insert', 'Recent', 'Frequent', 'Output Format', 'Tags', 'Properties', 'Unicode Table', 'Pretty Print', 'Default Filters', 'Tools']);
@@ -360,13 +379,14 @@ suite('Unicode sidebar', () => {
    ['youhavecode.defaultItem', undefined, 'term', 'favorite'],
   ]);
   const compatibility = await provider.getChildren(tools[0]);
-  assert.strictEqual(compatibility[0].label, 'iOS · 18 · required');
-  assert.strictEqual(new Set(compatibility.filter(item => item.group === 'compatibilityTarget' || item.group === 'compatibilityFallback').map(item => item.id)).size, 7);
+  assert.strictEqual(compatibility[0].label, 'iOS (📱)');
+  assert.match(String(compatibility[0].description), /^enforced · -/);
+  assert.strictEqual(new Set(compatibility.filter(item => item.group === 'compatibilityTarget' || item.group === 'compatibilityFallback' || item.group === 'compatibilityBadgeStyle').map(item => item.id)).size, 8);
   const localFont = compatibility.find(item => item.label === 'Local Font · permitted');
   assert.ok(localFont?.iconPath instanceof vscode.ThemeIcon);
   assert.strictEqual(localFont.iconPath.id, 'text-size');
   const ios = await provider.getChildren(compatibility[0]);
-  const selectedPolicy = ios.find(item => item.label === 'Policy: required');
+  const selectedPolicy = ios.find(item => item.label === 'Enforced (Must have glyph)');
   assert.ok(selectedPolicy?.iconPath instanceof vscode.ThemeIcon);
   assert.strictEqual(selectedPolicy.iconPath.id, 'check');
  });
@@ -1571,19 +1591,18 @@ test('routes Enter and Tab through the visible selected suggestion', () => {
   await vscode.commands.executeCommand('youhavecode.compatibility');
   let completions = await vscode.commands.executeCommand<vscode.CompletionList>('vscode.executeCompletionItemProvider', document.uri, editor.selection.active, ':');
   const labels = completions.items.map(item => typeof item.label === 'string' ? item.label : item.label.label);
-  assert.deepStrictEqual(labels, ['iOS…', 'Android (AOSP)…', 'macOS…', 'Windows…', 'Ubuntu…', 'Unknown Evidence…', 'Local Font…', 'Reset Compatibility Defaults']);
-  const ios = completions.items[0];
-  assert.strictEqual(typeof ios.label === 'string' ? '' : ios.label.description, 'current · warn');
+  assert.ok(labels.includes('iOS (📱)…'));
+  const ios = completions.items.find(item => typeof item.label !== 'string' && item.label.label === 'iOS (📱)…')!;
+  assert.match(typeof ios.label === 'string' ? '' : ios.label.description ?? '', /^Warned/);
   await vscode.commands.executeCommand(ios.command!.command, ...ios.command!.arguments ?? []);
   completions = await vscode.commands.executeCommand<vscode.CompletionList>('vscode.executeCompletionItemProvider', document.uri, editor.selection.active, ':');
   assert.deepStrictEqual(completions.items.map(item => typeof item.label === 'string' ? item.label : item.label.label), [
-   'Policy: required', 'Policy: warn', 'Policy: permitted', 'Policy: blocked', 'Version: current', 'Version: any', 'Version: Pin…',
+   'Enforced', 'Warned', 'Dismissed',
   ]);
-  await vscode.commands.executeCommand('youhavecode.setCompatibilityTargetPolicy', 'ios', 'required');
-  await vscode.commands.executeCommand('youhavecode.setCompatibilityTargetVersion', 'ios', '18');
+  await vscode.commands.executeCommand('youhavecode.setCompatibilityTargetPolicy', 'ios', 'enforced');
   await vscode.commands.executeCommand('youhavecode.setCompatibilityFallbackPolicy', 'unknown', 'unlist');
-  const targets = configuration.inspect<Record<string, { version: string; policy: string }>>('compatibilityTargets')?.globalValue;
-  assert.deepStrictEqual(targets?.ios, { version: '18', policy: 'required' });
+  const targets = configuration.inspect<Record<string, { policy: string }>>('compatibilityTargets')?.globalValue;
+  assert.strictEqual(targets?.ios?.policy, 'enforced');
   assert.strictEqual(configuration.inspect('compatibilityUnknownPolicy')?.globalValue, 'unlist');
   await vscode.commands.executeCommand('youhavecode.resetCompatibility');
   assert.strictEqual(configuration.inspect('compatibilityTargets')?.globalValue, undefined);
@@ -1848,15 +1867,15 @@ test('keeps YouHaveCode results above another provider after accepting Braille',
 
 test('shows platform compatibility warnings beside incompatible inline glyphs', async () => {
  const configuration = vscode.workspace.getConfiguration('youhavecode');
- await configuration.update('compatibilityTargets', { ios: { version: '17.0', policy: 'warn' } }, vscode.ConfigurationTarget.Global);
+ await configuration.update('compatibilityTargets', { ios: { version: '17.0', policy: 'warned' } }, vscode.ConfigurationTarget.Global);
  try {
   const content = '::head shaking horizontally';
   const document = await vscode.workspace.openTextDocument({ language: 'plaintext', content });
   const completions = await vscode.commands.executeCommand<vscode.CompletionList>('vscode.executeCompletionItemProvider', document.uri, new vscode.Position(0, content.length), ':');
   const shaking = completions.items.find(item => typeof item.label !== 'string' && item.label.label.includes('U+1F642-200D-2194-FE0F'))!;
   assert.ok(shaking);
-  assert.match(typeof shaking.label === 'string' ? '' : shaking.label.description ?? '', /^\(!Ap\) HEAD SHAKING HORIZONTALLY$/);
-  assert.match(String(shaking.detail), /Compatibility: iOS 17\.0<17\.4/);
+  assert.match(typeof shaking.label === 'string' ? '' : shaking.label.description ?? '', /^\(!📱\) HEAD SHAKING HORIZONTALLY$/);
+  assert.match(String(shaking.detail), /Compatibility: iOS/);
  } finally { await configuration.update('compatibilityTargets', undefined, vscode.ConfigurationTarget.Global); }
 });
 
@@ -2067,6 +2086,47 @@ test('preserves the selected emoji presentation in a Pretty Print completion pla
   assert.strictEqual(assignment.insertText, `+${tag})`);
   assert.strictEqual(assignment.command?.command, 'youhavecode.assignTagToPreviousGlyph');
   await vscode.commands.executeCommand('youhavecode.commitGlyph', '25CF', false, [], [], undefined, undefined, [{ operation: 'delete', tag }]);
+ });
+
+ test('surfaces compatibility shortcuts for platform search words without inserting a chip', async () => {
+  const androidContent = '::android';
+  const androidDocument = await vscode.workspace.openTextDocument({ language: 'plaintext', content: androidContent });
+  const androidCompletions = await vscode.commands.executeCommand<vscode.CompletionList>(
+   'vscode.executeCompletionItemProvider', androidDocument.uri, new vscode.Position(0, androidContent.length),
+  );
+  const androidItem = androidCompletions.items.find(item => typeof item.label !== 'string' && item.label.label.includes('Android(AOSP) Compatibility'))!;
+  assert.ok(androidItem, 'expected an Android compatibility shortcut');
+  assert.strictEqual(androidItem.insertText, '');
+  assert.strictEqual(androidItem.command?.command, 'youhavecode.compatibilityTarget');
+  assert.deepStrictEqual(androidItem.command?.arguments, ['android-aosp']);
+
+  const appleContent = '::apple';
+  const appleDocument = await vscode.workspace.openTextDocument({ language: 'plaintext', content: appleContent });
+  const appleCompletions = await vscode.commands.executeCommand<vscode.CompletionList>(
+   'vscode.executeCompletionItemProvider', appleDocument.uri, new vscode.Position(0, appleContent.length),
+  );
+  const appleTargets = appleCompletions.items.filter(item => typeof item.label !== 'string' && item.label.label.includes('Compatibility')).map(item => item.command?.arguments?.[0]);
+  assert.deepStrictEqual(appleTargets, ['macos', 'ios']);
+
+  const mobileContent = '::mobile';
+  const mobileDocument = await vscode.workspace.openTextDocument({ language: 'plaintext', content: mobileContent });
+  const mobileCompletions = await vscode.commands.executeCommand<vscode.CompletionList>(
+   'vscode.executeCompletionItemProvider', mobileDocument.uri, new vscode.Position(0, mobileContent.length),
+  );
+  const mobileTargets = mobileCompletions.items.filter(item => typeof item.label !== 'string' && item.label.label.includes('Compatibility')).map(item => item.command?.arguments?.[0]);
+  assert.deepStrictEqual(mobileTargets, ['ios', 'android-aosp']);
+ });
+
+ test('offers Product Icon suggestions that insert $(name) without a command', async () => {
+  const content = '::account';
+  const document = await vscode.workspace.openTextDocument({ language: 'plaintext', content });
+  const completions = await vscode.commands.executeCommand<vscode.CompletionList>(
+   'vscode.executeCompletionItemProvider', document.uri, new vscode.Position(0, content.length),
+  );
+  const accountItem = completions.items.find(item => typeof item.label !== 'string' && item.label.description === 'Product Icon' && item.label.label === '$(account) account')!;
+  assert.ok(accountItem, 'expected a Product Icon suggestion for "account"');
+  assert.strictEqual(accountItem.insertText, '$(account)');
+  assert.strictEqual(accountItem.command, undefined);
  });
 
  test('shows a singleton custom-tag glyph without a redundant tag chip', async () => {

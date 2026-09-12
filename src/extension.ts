@@ -1,13 +1,14 @@
 import * as vscode from 'vscode';
 import { actionKeys, applyCustomTagEdits, buildNameWords, canonicalFilterKey, countFilterValues, countMatchingWords, filterInputKeys, filterKeys, filterValues, glyphPropertyExpansions, glyphPropertyInputLabels, initialEntries, literalNameWords, matchingEntries, matchingWords, optionValues, outputValues, parseUnicodeQuery, propertyValue, queryOption, shouldRetriggerAfterEdit, suggestedOptionKeys, topMatchingWords, withDefaultFilters, type DefaultFilterConfig, type FilterKey, type OptionKey, type UnicodeOption, type UnicodeQuery, type UnicodeTagEdit } from './unicodeCompletions';
-import { mergeEmojiEntries, parseCompactUnicode, parseEmojiRgi, parseUnicodePropertyAliases, propertyValueDescription, type UnicodeEntry } from './unicodeData';
+import { mergeEmojiEntries, parseCompactUnicode, parseEmojiRgi, parseUnicodePropertyAliases, propertyValueDescription, type UnicodeEntry, type UnicodePropertyAliases } from './unicodeData';
 import { applyEmojiPresentation, deconstructUnicode, renderCodepointReference, renderHtmlEntity, renderLanguageEscape, renderUnicode, replacementOffsets, type DeconstructionFormat, type EmojiPresentation } from './unicodeDeconstruction';
 import { bitmapTextDimensions, startBitmapOnNewLine, textToBitmap, textToCustomArt, transformLayout, type BitmapD4, type BitmapFlowDirection, type BitmapTextFormat, type BitmapWrapDirection, type CustomArtProfile } from './unicodeBraille';
 import { defaultPrettyPrintFontFamilies, enumerateFontRenderings, glyphIconPng, installedFontFamilies, parseFontFamilyList, rasterizeEmojiArt, rasterizeGlyph, rasterizeGlyphBaseline, rasterizeGlyphBaselineTight, rasterizeGlyphBaselineTightForFamily, rasterizeGlyphBaselineForFamily, rasterizeGlyphForFamily, rasterizeImage, rasterizeImageEmojiArt, setPrettyPrintFontFamilies } from './glyphRaster';
 import { emptyUsageStats, glyphVariantKey, orderFilterValues, parseGlyphVariantKey, rankCustomTags, rankGlyphHexes, recentFilterValues, recordGlyph, recordTokens, recordUsageValue, resetUsageStats, type UsageRecord, type UsageStats } from './usageRanking';
 import { UnicodeSidebarProvider } from './unicodeSidebar';
 import { builtInDelegateProfiles, resolveDelegateProfile, type DelegateProfileConfig } from './delegateSandbox';
-import { compatibilitySummary, compatibilityTargets, compatibilityWarningBadge, compatibilityWarningText, emojiCompatibilityFindings, fallbackCompatibilityProfiles, fontCoverageFindings, hasCompleteFontCoverageEvidence, hasEmojiCompatibilityEvidence, parseCompatibilityProfiles, resolveCompatibilityTargets, unknownCompatibilityFindings, unknownCompatibilityWarningBadge, unknownCompatibilityWarningText, type CompatibilityFallbackPolicy, type CompatibilityPolicy, type CompatibilityProfiles, type CompatibilityTarget, type CompatibilityTargetSettings } from './compatibilitySettings';
+import { matchingProductIcons, parseProductIcons, type ProductIcon } from './productIcons';
+import { compatibilityDraftAliases, compatibilityStatusBadges, compatibilitySummary, compatibilitySupportedNames, compatibilityTargets, compatibilityWarningBadge, compatibilityWarningText, emojiCompatibilityFindings, fallbackCompatibilityProfiles, fontCoverageFindings, getTargetCodicon, getTargetSymbol, hasCompleteFontCoverageEvidence, hasEmojiCompatibilityEvidence, normalizePolicy, parseCompatibilityProfiles, resolveCompatibilityTargets, unknownCompatibilityFindings, unknownCompatibilityWarningBadge, unknownCompatibilityWarningText, unsupportedGlyphCount, type CompatibilityBadgeStyle, type CompatibilityFallbackPolicy, type CompatibilityPolicy, type CompatibilityProfiles, type CompatibilityTarget, type CompatibilityTargetSettings } from './compatibilitySettings';
 
 export interface RenderDefaults { render: string; size: string; wrap: string; compact: string; mapping?: string; flow: string; 'wrap-direction': string; d4: string }
 interface UtilityAction { key: 'recent' | 'frequent' | 'customTags' | 'properties' | 'defaultFilters' | 'compatibility' | 'settings' | 'outputFormat'; label: string; terms: readonly string[]; command: string; commandTitle: string; commandArguments?: readonly unknown[]; kind: vscode.CompletionItemKind; rootSort: string }
@@ -237,6 +238,7 @@ export async function activate(context: vscode.ExtensionContext) {
  let aliasesPromise: ReturnType<typeof loadAliases> | undefined;
  let wordsPromise: ReturnType<typeof buildNameWords> | undefined;
  let compatibilityProfilesPromise: Promise<CompatibilityProfiles> | undefined;
+ let productIconsPromise: Promise<ProductIcon[]> | undefined;
  let suggestTimer: ReturnType<typeof setTimeout> | undefined;
  let typingSuggestTimer: ReturnType<typeof setTimeout> | undefined;
  let completionAnchor: { document: vscode.TextDocument; line: number; character: number; prefix: string } | undefined;
@@ -293,6 +295,8 @@ export async function activate(context: vscode.ExtensionContext) {
  ));
  const loadCompatibilityProfiles = () => compatibilityProfilesPromise ??= Promise.resolve(vscode.workspace.fs.readFile(vscode.Uri.joinPath(context.extensionUri, 'data', 'compatibility_profiles.json')))
   .then(bytes => parseCompatibilityProfiles(bytes), () => fallbackCompatibilityProfiles);
+ const loadProductIcons = () => productIconsPromise ??= Promise.resolve(vscode.workspace.fs.readFile(vscode.Uri.joinPath(context.extensionUri, 'data', 'codicons.json')))
+  .then(bytes => parseProductIcons(bytes), () => []);
  function loadAliases() {
   return Promise.resolve(vscode.workspace.fs.readFile(vscode.Uri.joinPath(context.extensionUri, 'data', 'unicode_property_aliases.csv')))
    .then(bytes => parseUnicodePropertyAliases(new TextDecoder().decode(bytes)));
@@ -333,6 +337,7 @@ export async function activate(context: vscode.ExtensionContext) {
  };
  const configuredCompatibilityTargets = () => resolveCompatibilityTargets(vscode.workspace.getConfiguration('youhavecode').get<Partial<CompatibilityTargetSettings>>('compatibilityTargets', {}));
  const configuredCompatibilityFallback = (key: 'compatibilityUnknownPolicy' | 'compatibilityLocalFontPolicy') => vscode.workspace.getConfiguration('youhavecode').get<CompatibilityFallbackPolicy>(key, 'warn');
+ const configuredCompatibilityIndicatorMode = () => vscode.workspace.getConfiguration('youhavecode').get<'warnings' | 'all'>('compatibilityIndicatorMode', 'warnings');
  const configuredCompatibilitySummary = () => compatibilitySummary(configuredCompatibilityTargets(), configuredCompatibilityFallback('compatibilityUnknownPolicy'), configuredCompatibilityFallback('compatibilityLocalFontPolicy'));
  const effectiveConfigurationTarget = (key: string): vscode.ConfigurationTarget => {
   const inspected = vscode.workspace.getConfiguration('youhavecode').inspect(key);
@@ -370,6 +375,7 @@ export async function activate(context: vscode.ExtensionContext) {
   defaultFilters: configuredDefaultFilters,
   defaultTerms: configuredDefaultTerms,
   disabledDefaults: configuredDisabledDefaultItems,
+  disabledTableNodes: () => vscode.workspace.getConfiguration('youhavecode').get<string[]>('disabledTableNodes', []),
   output: () => vscode.workspace.getConfiguration('youhavecode').get('defaultOutput', 'glyph'),
   prettyPrintDefaults: () => {
    const defaults = configuredRenderDefaults(context);
@@ -390,7 +396,23 @@ export async function activate(context: vscode.ExtensionContext) {
    dark: vscode.Uri.joinPath(context.extensionUri, 'resources', 'direction', `${paired ? 'wrap-' : ''}${direction}-dark.svg`),
    light: vscode.Uri.joinPath(context.extensionUri, 'resources', 'direction', `${paired ? 'wrap-' : ''}${direction}-light.svg`),
   }),
-  compatibility: () => ({ targets: configuredCompatibilityTargets(), unknown: configuredCompatibilityFallback('compatibilityUnknownPolicy'), localFont: configuredCompatibilityFallback('compatibilityLocalFontPolicy') }),
+  platformIcon: target => target === 'ubuntu' ? undefined : ({
+   dark: vscode.Uri.joinPath(context.extensionUri, 'resources', 'platforms', `${target}-dark.svg`),
+   light: vscode.Uri.joinPath(context.extensionUri, 'resources', 'platforms', `${target}-light.svg`),
+  }),
+  compatibility: () => ({
+   targets: configuredCompatibilityTargets(),
+   unknown: configuredCompatibilityFallback('compatibilityUnknownPolicy'),
+   localFont: configuredCompatibilityFallback('compatibilityLocalFontPolicy'),
+   badgeStyle: vscode.workspace.getConfiguration('youhavecode').get<CompatibilityBadgeStyle>('compatibilityBadgeStyle', 'symbol'),
+  }),
+  compatibilityProfiles: loadCompatibilityProfiles,
+  renderGlyphOutput: async (hex, presentation) => {
+   const entry = (await loadEntries()).find(candidate => candidate.hex === hex);
+   if (!entry) { return ''; }
+   const resolvedPresentation = presentation ?? vscode.workspace.getConfiguration('youhavecode').get<EmojiPresentation>('emojiPresentation', 'auto');
+   return renderUnicode(entry.character, await loadEntries(), insertionFormat, resolvedPresentation);
+  },
  });
  const emojiPresentation = () => vscode.workspace.getConfiguration('youhavecode').get<EmojiPresentation>('emojiPresentation', 'auto');
  const presentedCharacter = (character: string, presentation = emojiPresentation()) => applyEmojiPresentation(character, presentation);
@@ -907,7 +929,7 @@ export async function activate(context: vscode.ExtensionContext) {
     await saveFontPreference(active, state.disabled);
    };
  context.subscriptions.push(
-  vscode.window.registerTreeDataProvider('youhavecode.unicode', sidebar),
+  vscode.window.createTreeView('youhavecode.unicode', { treeDataProvider: sidebar, dragAndDropController: sidebar }),
   vscode.commands.registerCommand('youhavecode.refreshSidebar', () => sidebar.refresh()),
   vscode.commands.registerCommand('youhavecode.openInlineTags', () => openInlineQuery('youhavecode.customTags')),
   vscode.commands.registerCommand('youhavecode.searchTag', toggleInlineTag),
@@ -1352,6 +1374,18 @@ export async function activate(context: vscode.ExtensionContext) {
   if (!item.defaultKind || !item.defaultKey) { return; }
   await vscode.commands.executeCommand(item.defaultKind === 'property' ? 'youhavecode.removeDefaultFilter' : 'youhavecode.removeDefaultSearchTerm', item.defaultKey);
   }),
+  vscode.commands.registerCommand('youhavecode.toggleTableNode', async (item: { tableNodeKey?: string }) => {
+   if (!item?.tableNodeKey) { return; }
+   const configuration = vscode.workspace.getConfiguration('youhavecode');
+   const disabled = new Set(configuration.get<string[]>('disabledTableNodes', []));
+   if (disabled.has(item.tableNodeKey)) {
+    disabled.delete(item.tableNodeKey);
+   } else {
+    disabled.add(item.tableNodeKey);
+   }
+   await configuration.update('disabledTableNodes', [...disabled], vscode.ConfigurationTarget.Global);
+   sidebar.refresh();
+  }),
   vscode.commands.registerCommand('youhavecode.sidebarAddDefaultTerm', async () => {
    const term = await vscode.window.showInputBox({ title: 'Add Default Search Term', prompt: 'Enter a Unicode name word or custom tag', validateInput: value => /^[\p{L}\p{N}][\p{L}\p{N}_-]*$/u.test(value.trim()) ? undefined : 'Use letters, numbers, underscores, or hyphens.' });
    if (term) { await vscode.commands.executeCommand('youhavecode.addDefaultSearchTerm', term); }
@@ -1405,6 +1439,28 @@ export async function activate(context: vscode.ExtensionContext) {
   sidebar.refresh();
   if (activeQuery()) { await vscode.commands.executeCommand('youhavecode.compatibility'); }
   }),
+  vscode.commands.registerCommand('youhavecode.setCompatibilityPreset', async () => {
+   const hostOs = process.platform;
+   const currentTargetKey: CompatibilityTarget = hostOs === 'darwin' ? 'macos' : hostOs === 'win32' ? 'windows' : 'ubuntu';
+   const options = [
+    { label: 'Warn All Platforms', description: 'Show warnings/badges for missing glyphs on any platform', policyMap: Object.fromEntries(compatibilityTargets.map(t => [t.key, 'warned'])) },
+    { label: 'Enforce All Platforms', description: 'Hide any glyph missing on at least one platform', policyMap: Object.fromEntries(compatibilityTargets.map(t => [t.key, 'enforced'])) },
+    { label: 'Dismiss All Platforms', description: 'Disregard all platform compatibility checks', policyMap: Object.fromEntries(compatibilityTargets.map(t => [t.key, 'dismissed'])) },
+    { label: 'Current Platform Only', description: `Enforce ${compatibilityTargets.find(t => t.key === currentTargetKey)?.label ?? currentTargetKey} support, dismiss others`, policyMap: Object.fromEntries(compatibilityTargets.map(t => [t.key, t.key === currentTargetKey ? 'enforced' : 'dismissed'])) },
+    { label: 'Desktop OS Only', description: 'Enforce macOS, Windows, and Ubuntu Linux support', policyMap: Object.fromEntries(compatibilityTargets.map(t => [t.key, ['macos', 'windows', 'ubuntu'].includes(t.key) ? 'enforced' : 'dismissed'])) },
+    { label: 'Typical Consumer Stack', description: 'Enforce macOS, iOS, Windows, and Android support', policyMap: Object.fromEntries(compatibilityTargets.map(t => [t.key, ['macos', 'ios', 'windows', 'android-aosp'].includes(t.key) ? 'enforced' : 'dismissed'])) },
+   ];
+   const choice = await vscode.window.showQuickPick(options, { title: 'Choose Compatibility Policy Preset' });
+   if (!choice) { return; }
+   const configured = configuredCompatibilityTargets();
+   const updated = Object.fromEntries(compatibilityTargets.map(({ key }) => [
+    key,
+    { ...configured[key], policy: choice.policyMap[key] as CompatibilityPolicy },
+   ]));
+   await vscode.workspace.getConfiguration('youhavecode').update('compatibilityTargets', updated, vscode.ConfigurationTarget.Global);
+   sidebar.refresh();
+   if (activeQuery()) { await vscode.commands.executeCommand('youhavecode.compatibility'); }
+  }),
   vscode.commands.registerCommand('youhavecode.setCompatibilityTargetVersion', async (target: CompatibilityTarget, version: string) => {
    const configured = configuredCompatibilityTargets();
    await vscode.workspace.getConfiguration('youhavecode').update('compatibilityTargets', { ...configured, [target]: { ...configured[target], version } }, vscode.ConfigurationTarget.Global);
@@ -1421,12 +1477,18 @@ export async function activate(context: vscode.ExtensionContext) {
   sidebar.refresh();
   if (activeQuery()) { await vscode.commands.executeCommand('youhavecode.compatibility'); }
   }),
+  vscode.commands.registerCommand('youhavecode.setCompatibilityBadgeStyle', async (style: CompatibilityBadgeStyle) => {
+   await vscode.workspace.getConfiguration('youhavecode').update('compatibilityBadgeStyle', style, vscode.ConfigurationTarget.Global);
+   sidebar.refresh();
+   if (activeQuery()) { await vscode.commands.executeCommand('youhavecode.compatibility'); }
+  }),
   vscode.commands.registerCommand('youhavecode.resetCompatibility', async () => {
    const configuration = vscode.workspace.getConfiguration('youhavecode');
    await Promise.all([
     configuration.update('compatibilityTargets', undefined, vscode.ConfigurationTarget.Global),
     configuration.update('compatibilityUnknownPolicy', undefined, vscode.ConfigurationTarget.Global),
     configuration.update('compatibilityLocalFontPolicy', undefined, vscode.ConfigurationTarget.Global),
+    configuration.update('compatibilityBadgeStyle', undefined, vscode.ConfigurationTarget.Global),
    ]);
   sidebar.refresh();
   if (activeQuery()) { await vscode.commands.executeCommand('youhavecode.compatibility'); }
@@ -1519,7 +1581,7 @@ export async function activate(context: vscode.ExtensionContext) {
   completionAnchor = { document, line: position.line, character: query.expressionStart, prefix: query.prefix };
   await vscode.commands.executeCommand('setContext', 'youhavecode.queryActive', true);
 
-    const [entries, words, aliases, compatibilityProfiles] = await Promise.all([loadEntries(), loadWords(), getAliases(), loadCompatibilityProfiles()]);
+    const [entries, words, aliases, compatibilityProfiles, productIcons] = await Promise.all([loadEntries(), loadWords(), getAliases(), loadCompatibilityProfiles(), loadProductIcons()]);
    const draftRange = new vscode.Range(position.line, query.draftStart, position.line, position.character);
     const completionRange = { inserting: draftRange, replacing: draftRange };
     const inlineMenu = inlineMenuAnchor?.document === document && inlineMenuAnchor.version === document.version
@@ -1527,12 +1589,30 @@ export async function activate(context: vscode.ExtensionContext) {
      && inlineMenuAnchor.expressionStart === query.expressionStart ? inlineMenuAnchor.kind : undefined;
     if (inlineMenu === 'compatibility') {
      const targets = configuredCompatibilityTargets();
+     const currentStyle = vscode.workspace.getConfiguration('youhavecode').get<CompatibilityBadgeStyle>('compatibilityBadgeStyle', 'symbol');
+     const presetItem = new vscode.CompletionItem('Presets…', vscode.CompletionItemKind.Folder);
+     presetItem.detail = 'Enforce All, Warn All, Dismiss All, Current Platform, Desktop OS, or Typical Consumer Stack';
+     presetItem.insertText = ''; presetItem.range = completionRange; presetItem.sortText = '!000';
+     presetItem.command = { command: 'youhavecode.setCompatibilityPreset', title: 'Compatibility Presets' };
      const items = compatibilityTargets.map(({ key, label }, index) => {
       const target = targets[key];
-      const item = new vscode.CompletionItem({ label: `${label}…`, description: `${target.version} · ${target.policy}` }, vscode.CompletionItemKind.Folder);
-      item.detail = 'Configure the platform version and support policy';
-      item.insertText = ''; item.range = completionRange; item.sortText = `!0${index}`;
+      const symbol = getTargetSymbol(key);
+      const policy = normalizePolicy(target.policy);
+      const policyLabel = policy === 'enforced' ? 'Enforced' : policy === 'dismissed' ? 'Dismissed' : 'Warned';
+      const count = unsupportedGlyphCount(entries, key, compatibilityProfiles, target.version);
+      const lossText = `-${count} glyph${count === 1 ? '' : 's'}`;
+      const itemLabel = currentStyle === 'icon' ? `$(${getTargetCodicon(key)}) ${label}…` : `${label} (${symbol})…`;
+      const item = new vscode.CompletionItem({ label: itemLabel, description: `${policyLabel} · ${lossText}` }, vscode.CompletionItemKind.Folder);
+      item.detail = 'Configure the platform support policy';
+      item.insertText = ''; item.range = completionRange; item.sortText = `!0${index + 1}`;
       item.command = { command: 'youhavecode.compatibilityTarget', title: `Configure ${label}`, arguments: [key] };
+      return item;
+     });
+     const styleItems = (['symbol', 'letter', 'icon'] as const).map((style, index) => {
+      const item = new vscode.CompletionItem({ label: `Badge Style: ${style === 'symbol' ? 'Symbol (🍎/)' : style === 'letter' ? 'Letter (Mac)' : 'Product Icons'}`, description: style === currentStyle ? 'current' : '' }, vscode.CompletionItemKind.EnumMember);
+      item.detail = style === 'symbol' ? 'Use emoji symbols for compatibility badges' : style === 'letter' ? 'Use letter abbreviations for compatibility badges' : 'Use VS Code Product Icons for compatibility badges';
+      item.insertText = ''; item.range = completionRange; item.sortText = `!1${index}`;
+      item.command = { command: 'youhavecode.setCompatibilityBadgeStyle', title: `Use ${style} badges`, arguments: [style] };
       return item;
      });
      const fallbackItems = ([
@@ -1540,37 +1620,34 @@ export async function activate(context: vscode.ExtensionContext) {
       { key: 'localFont' as const, label: 'Local Font…', policy: configuredCompatibilityFallback('compatibilityLocalFontPolicy'), detail: 'Behavior when no installed local font can render a glyph' },
      ]).map((fallback, index) => {
       const item = new vscode.CompletionItem({ label: fallback.label, description: fallback.policy }, vscode.CompletionItemKind.Folder);
-      item.detail = fallback.detail; item.insertText = ''; item.range = completionRange; item.sortText = `!1${index}`;
+      item.detail = fallback.detail; item.insertText = ''; item.range = completionRange; item.sortText = `!2${index}`;
       item.command = { command: 'youhavecode.compatibilityFallback', title: `Configure ${fallback.label}`, arguments: [fallback.key] };
       return item;
      });
      const reset = new vscode.CompletionItem('Reset Compatibility Defaults', vscode.CompletionItemKind.Event);
-     reset.detail = 'Restore every known target to current + warn'; reset.insertText = ''; reset.range = completionRange; reset.sortText = '!299';
+     reset.detail = 'Restore every platform policy to Warned'; reset.insertText = ''; reset.range = completionRange; reset.sortText = '!399';
      reset.command = { command: 'youhavecode.resetCompatibility', title: 'Reset compatibility defaults' };
-     return new vscode.CompletionList([...items, ...fallbackItems, reset], true);
+     return new vscode.CompletionList([presetItem, ...items, ...styleItems, ...fallbackItems, reset], true);
     }
     if (inlineMenu === 'compatibilityTarget' && inlineMenuAnchor?.compatibilityTarget) {
      const target = inlineMenuAnchor.compatibilityTarget;
      const configured = configuredCompatibilityTargets()[target];
-     const policies: readonly CompatibilityPolicy[] = ['required', 'warn', 'permitted', 'blocked'];
-     const policyItems = policies.map((policy, index) => {
-      const item = new vscode.CompletionItem({ label: `Policy: ${policy}`, description: policy === configured.policy ? 'current' : '' }, vscode.CompletionItemKind.EnumMember);
-      item.detail = { required: 'Unlist known unsupported glyphs', warn: 'List with a compatibility warning', permitted: 'List without warnings or filtering', blocked: 'Exclude glyphs supported only for this target' }[policy];
+     const currentPolicy = normalizePolicy(configured.policy);
+     const count = unsupportedGlyphCount(entries, target, compatibilityProfiles, configured.version);
+     const lossText = `-${count} glyph${count === 1 ? '' : 's'}`;
+     const options = [
+      { key: 'enforced' as const, label: 'Enforced', detail: `Must have glyph (${lossText} unlisted)` },
+      { key: 'warned' as const, label: 'Warned', detail: `Will be warned when missing (${lossText} badged)` },
+      { key: 'dismissed' as const, label: 'Dismissed', detail: 'Disregard platform support checks' },
+     ];
+     const policyItems = options.map((opt, index) => {
+      const item = new vscode.CompletionItem({ label: opt.label, description: opt.key === currentPolicy ? `current · ${lossText}` : lossText }, vscode.CompletionItemKind.EnumMember);
+      item.detail = opt.detail;
       item.insertText = ''; item.range = completionRange; item.sortText = `!0${index}`;
-      item.command = { command: 'youhavecode.setCompatibilityTargetPolicy', title: `Use ${policy}`, arguments: [target, policy] };
+      item.command = { command: 'youhavecode.setCompatibilityTargetPolicy', title: `Use ${opt.label}`, arguments: [target, opt.key] };
       return item;
      });
-     const versions = ['current', 'any'].map((version, index) => {
-      const item = new vscode.CompletionItem({ label: `Version: ${version}`, description: version === configured.version ? 'current' : '' }, vscode.CompletionItemKind.EnumMember);
-      item.detail = version === 'current' ? 'Use the latest bundled platform profile' : 'Accept support from any bundled version';
-      item.insertText = ''; item.range = completionRange; item.sortText = `!1${index}`;
-      item.command = { command: 'youhavecode.setCompatibilityTargetVersion', title: `Use ${version}`, arguments: [target, version] };
-      return item;
-     });
-     const pinned = new vscode.CompletionItem({ label: 'Version: Pin…', description: !['current', 'any'].includes(configured.version) ? configured.version : '' }, vscode.CompletionItemKind.Value);
-     pinned.detail = 'Enter a specific reproducible platform version'; pinned.insertText = ''; pinned.range = completionRange; pinned.sortText = '!12';
-     pinned.command = { command: 'youhavecode.pinCompatibilityTargetVersion', title: 'Pin platform version', arguments: [target] };
-     return new vscode.CompletionList([...policyItems, ...versions, pinned], true);
+     return new vscode.CompletionList(policyItems, true);
     }
     if (inlineMenu === 'compatibilityFallback' && inlineMenuAnchor?.compatibilityFallback) {
      const fallback = inlineMenuAnchor.compatibilityFallback;
@@ -1730,10 +1807,15 @@ export async function activate(context: vscode.ExtensionContext) {
     const rankedEntries = rankGlyphHexes(usageStats, inlineMenu).flatMap(hex => matching.get(hex) ?? []).slice(0, inlineMenu === 'recent' ? 25 : undefined);
      const repeat = query.prefix === ':::';
      const output = effectiveQueryOption(query, 'render', renderDefaults);
-    const rankedItems = rankedEntries.flatMap((entry, index) => emojiPresentationChoices(entry, emojiPresentation(), query.representation === undefined || query.representation === 'glyph').map((choice, variantIndex) => {
-    const compatibilityNotice = glyphCompatibilityNotice(entry, configuredCompatibilityTargets(), configuredCompatibilityFallback('compatibilityUnknownPolicy'), compatibilityProfiles);
-    const item = new vscode.CompletionItem({ label: `${displayGlyph(entry, choice.presentation)}${choice.label ? ` ${choice.label} · U+` : '  U+'}${entry.hex}`, description: compatibilityNotice.badge ? `${compatibilityNotice.badge} ${entry.name}` : entry.name }, vscode.CompletionItemKind.Text);
-      item.detail = `${inlineMenu === 'recent' ? 'Recently used' : `${usageStats.glyphs[entry.hex]?.count ?? 0} uses`} · Insert as ${queryOutputLabel(query, insertionFormat, renderDefaults)}${compatibilityNotice.detail ? ` · Compatibility: ${compatibilityNotice.detail}` : ''}`;
+    const rankedItems = rankedEntries.flatMap((entry, index) => {
+     const compatibilityNotice = glyphCompatibilityNotice(entry, configuredCompatibilityTargets(), configuredCompatibilityFallback('compatibilityUnknownPolicy'), compatibilityProfiles);
+     if (compatibilityNotice.excluded) { return []; }
+     return emojiPresentationChoices(entry, emojiPresentation(), query.representation === undefined || query.representation === 'glyph').map((choice, variantIndex) => {
+      const compatibilityIndicator = configuredCompatibilityIndicatorMode() === 'all' ? compatibilityNotice.status : compatibilityNotice.badge;
+      const item = new vscode.CompletionItem({ label: `${displayGlyph(entry, choice.presentation)}${choice.label ? ` ${choice.label} · U+` : '  U+'}${entry.hex}`, description: compatibilityIndicator ? `${compatibilityIndicator} ${entry.name}` : entry.name }, vscode.CompletionItemKind.Text);
+      const compat = compatibilityNotice.iconCompat;
+      item.detail = inlineMenu === 'recent' ? 'Recently used' : `${usageStats.glyphs[entry.hex]?.count ?? 0} uses`;
+      item.documentation = glyphPropertySummary(entry, aliases, compat);
       item.filterText = `${entry.name} ${entry.hex} ${entry.character}${choice.label ? ` ${choice.label}` : ''}`;
       item.insertText = renderCompletionOutput(entry.character, entries, query, output, insertionFormat, choice.presentation, document.languageId) + (repeat ? ':::' : '');
       item.range = completionRange;
@@ -1750,7 +1832,8 @@ export async function activate(context: vscode.ExtensionContext) {
        ],
       };
       return item;
-    }));
+     });
+    });
       return new vscode.CompletionList(rankedItems.length ? rankedItems : [emptyMenuItem(`No ${inlineMenu} glyphs match this query`, completionRange)], true);
     }
     if (query.mode === 'glyphProperty' && query.glyphLiteral) {
@@ -1779,12 +1862,14 @@ export async function activate(context: vscode.ExtensionContext) {
      const activeValues = new Set(previous?.value.split('|') ?? []);
      const values = orderFilterValues(filterValues(entries, query.filterKey, query.draft).filter(value => !activeValues.has(value)), recentFilterValues(usageStats, query.filterKey));
     const counts = countFilterValues(entries, query, query.filterKey, values, customGlyphTags);
+    const blockRanges = query.filterKey === 'block' ? codepointRangesByBlock(entries) : undefined;
      const valueItems = values.map((value, index) => {
       const description = propertyValueDescription(aliases, query.filterKey!, value);
       const count = counts.get(value) ?? 0;
+      const range = blockRanges?.get(value);
       const chip = `(${query.filterKey}=${value})`;
-      const item = new vscode.CompletionItem({ label: chip, description: `${description ? `${description} · ` : ''}${count.toLocaleString()} glyphs` }, vscode.CompletionItemKind.EnumMember);
-     item.detail = `${count.toLocaleString()} glyphs`;
+      const item = new vscode.CompletionItem({ label: chip, description: `${description ? `${description} · ` : ''}${count.toLocaleString()} glyphs${range ? ` · ${range}` : ''}` }, vscode.CompletionItemKind.EnumMember);
+     item.detail = `${count.toLocaleString()} glyphs${range ? ` · ${range}` : ''}`;
      item.filterText = value;
     item.insertText = query.unwrappedFilter ? chip : `${[...activeValues, value].join('|')})`;
     if (activeValues.size) {
@@ -1866,6 +1951,20 @@ export async function activate(context: vscode.ExtensionContext) {
    items.push(item);
   });
   const draft = query.draft.toLowerCase();
+  const compatibilityDraftTargets = query.mode === 'token' ? compatibilityDraftAliases[draft] : undefined;
+  compatibilityDraftTargets?.forEach((compatibilityDraftTarget, targetIndex) => {
+   const targetLabel = compatibilityTargets.find(candidate => candidate.key === compatibilityDraftTarget)?.label ?? compatibilityDraftTarget;
+   const currentPolicy = normalizePolicy(configuredCompatibilityTargets()[compatibilityDraftTarget]?.policy);
+   const policyLabel = currentPolicy === 'enforced' ? 'Enforced' : currentPolicy === 'dismissed' ? 'Dismissed' : 'Warned';
+   const item = new vscode.CompletionItem({ label: `$(${getTargetCodicon(compatibilityDraftTarget)}) Change ${targetLabel} Compatibility…`, description: policyLabel }, vscode.CompletionItemKind.Event);
+   item.detail = `Configure the ${targetLabel} platform support policy without inserting a glyph`;
+   item.filterText = draft;
+   item.insertText = '';
+   item.range = completionRange;
+   item.sortText = `!00${targetIndex}`;
+   item.command = { command: 'youhavecode.compatibilityTarget', title: `Configure ${targetLabel}`, arguments: [compatibilityDraftTarget] };
+   items.push(item);
+  });
   if (query.mode === 'token' && /^[+-][a-z]*$/u.test(draft) && 'debug'.startsWith(draft.slice(1))) {
    const enabled = draft.startsWith('+');
   const debugItem = new vscode.CompletionItem({ label: enabled ? '$(debug) Enable Developer/Debug Mode' : '$(debug) Disable Developer/Debug Mode', description: developerDebugMode === enabled ? 'already selected' : enabled ? 'Show developer-only Pretty Print tools' : 'Hide developer-only Pretty Print tools' }, vscode.CompletionItemKind.Event);
@@ -1957,40 +2056,45 @@ export async function activate(context: vscode.ExtensionContext) {
      .sort((left, right) => Number(exactCustomTagMatch(right)) - Number(exactCustomTagMatch(left)));
     const restoreGlyphSelection = !query.draft && !query.words.length && !query.filters.length
      && resultEntries.some(entry => entry.hex === preferredGlyphHex);
-    resultEntries.forEach((entry, index) => emojiPresentationChoices(entry, emojiPresentation(), query.representation === undefined || query.representation === 'glyph').forEach((choice, variantIndex) => {
-    const compatibilityNotice = glyphCompatibilityNotice(entry, configuredCompatibilityTargets(), configuredCompatibilityFallback('compatibilityUnknownPolicy'), compatibilityProfiles);
-    const item = new vscode.CompletionItem({ label: `${displayGlyph(entry, choice.presentation)}${choice.label ? ` ${choice.label} · U+` : '  U+'}${entry.hex}`, description: compatibilityNotice.badge ? `${compatibilityNotice.badge} ${entry.name}` : entry.name }, vscode.CompletionItemKind.Text);
-    item.detail = `${entry.category} · Bidi ${entry.bidi} · Combining ${entry.combining} · Insert as ${queryOutputLabel(query, insertionFormat, renderDefaults)}${compatibilityNotice.detail ? ` · Compatibility: ${compatibilityNotice.detail}` : ''}`;
+    resultEntries.forEach((entry, index) => {
+     const compatibilityNotice = glyphCompatibilityNotice(entry, configuredCompatibilityTargets(), configuredCompatibilityFallback('compatibilityUnknownPolicy'), compatibilityProfiles);
+     if (compatibilityNotice.excluded) { return; }
+     emojiPresentationChoices(entry, emojiPresentation(), query.representation === undefined || query.representation === 'glyph').forEach((choice, variantIndex) => {
+      const compatibilityIndicator = configuredCompatibilityIndicatorMode() === 'all' ? compatibilityNotice.status : compatibilityNotice.badge;
+      const item = new vscode.CompletionItem({ label: `${displayGlyph(entry, choice.presentation)}${choice.label ? ` ${choice.label} · U+` : '  U+'}${entry.hex}`, description: compatibilityIndicator ? `${compatibilityIndicator} ${entry.name}` : entry.name }, vscode.CompletionItemKind.Text);
+      const compat = compatibilityNotice.iconCompat;
+      item.documentation = glyphPropertySummary(entry, aliases, compat);
       item.filterText = `${entry.name} ${entry.hex} ${entry.character} ${(customGlyphTags[entry.hex] ?? []).join(' ')}${choice.label ? ` ${choice.label}` : ''}`;
-    const repeat = query.prefix === ':::';
-    const output = effectiveQueryOption(query, 'render', renderDefaults);
-    item.insertText = renderCompletionOutput(entry.character, entries, query, output, insertionFormat, choice.presentation, document.languageId) + (repeat ? ':::' : '');
-    item.range = completionRange;
-    const exactLiteral = entry.character === query.draft;
-    item.sortText = continuationSession && entry.hex === preferredGlyphHex ? `!01000${variantIndex}`
-     : `${exactLiteral || exactCustomTagMatch(entry) ? '!05' : '!2'}${String(index).padStart(4, '0')}${variantIndex}`;
-    const emptyRoot = !query.draft && !query.words.length && !query.filters.length;
-    item.preselect = !canReplay && (emptyRoot
-    ? restoreGlyphSelection && entry.hex === preferredGlyphHex && variantIndex === 0
-    : variantIndex === 0 && !matchingUtilities.length && (!literalWords.length && !compoundLiteralExpansion && exactLiteral || !wordMatches.length && !compoundLiteralExpansion && index === 0));
-    item.command = {
-     command: 'youhavecode.commitGlyph',
-     title: repeat ? 'Insert another glyph' : 'Remember recently used glyph',
-    arguments: [
-     entry.hex,
-     repeat,
-     reusableQueryTokens(query),
-     query.options,
-     { line: position.line, start: query.expressionStart, end: query.draftStart },
-    isBitmapQueryOutput(query, output) ? { query, leadingText: document.lineAt(position).text.slice(0, query.expressionStart) } : undefined,
-    query.tagEdits,
-    query.prefix === '::',
-    boundedSession,
-    choice.presentation,
-    ],
-    };
-    items.push(item);
-    }));
+      const repeat = query.prefix === ':::';
+      const output = effectiveQueryOption(query, 'render', renderDefaults);
+      item.insertText = renderCompletionOutput(entry.character, entries, query, output, insertionFormat, choice.presentation, document.languageId) + (repeat ? ':::' : '');
+      item.range = completionRange;
+      const exactLiteral = entry.character === query.draft;
+      item.sortText = continuationSession && entry.hex === preferredGlyphHex ? `!01000${variantIndex}`
+       : `${exactLiteral || exactCustomTagMatch(entry) ? '!05' : '!2'}${String(index).padStart(4, '0')}${variantIndex}`;
+      const emptyRoot = !query.draft && !query.words.length && !query.filters.length;
+      item.preselect = !canReplay && (emptyRoot
+      ? restoreGlyphSelection && entry.hex === preferredGlyphHex && variantIndex === 0
+      : variantIndex === 0 && !matchingUtilities.length && (!literalWords.length && !compoundLiteralExpansion && exactLiteral || !wordMatches.length && !compoundLiteralExpansion && index === 0));
+      item.command = {
+       command: 'youhavecode.commitGlyph',
+       title: repeat ? 'Insert another glyph' : 'Remember recently used glyph',
+       arguments: [
+        entry.hex,
+        repeat,
+        reusableQueryTokens(query),
+        query.options,
+        { line: position.line, start: query.expressionStart, end: query.draftStart },
+        isBitmapQueryOutput(query, output) ? { query, leadingText: document.lineAt(position).text.slice(0, query.expressionStart) } : undefined,
+        query.tagEdits,
+        query.prefix === '::',
+        boundedSession,
+        choice.presentation,
+       ],
+      };
+      items.push(item);
+     });
+    });
     matchingUtilities.forEach((action, index) => {
       const label = action.key === 'outputFormat' ? { label: action.label, description: `= ${renderDefaults.render}` }
       : action.key === 'defaultFilters' ? { label: action.label, description: defaultFilterSummary() || 'None' }
@@ -2021,8 +2125,21 @@ export async function activate(context: vscode.ExtensionContext) {
      });
     }
     if (!items.length) {
-     const activeDefaults = [...enabledDefaultTerms(), defaultFilterSummary()].filter(Boolean).join(' ');
-     items.push(noMatchesItem(query.draft, completionRange, activeDefaults));
+     const iconMatches = query.mode === 'token' ? matchingProductIcons(productIcons, query.draft) : [];
+     if (iconMatches.length) {
+      iconMatches.forEach((icon, index) => {
+       const item = new vscode.CompletionItem({ label: `$(${icon.name}) ${icon.name}`, description: 'Product Icon' }, vscode.CompletionItemKind.Color);
+       item.detail = icon.description ? `${icon.description}${icon.tags?.length ? ` · ${icon.tags.join(', ')}` : ''}` : 'VS Code Product Icon';
+       item.filterText = query.draft;
+       item.insertText = `$(${icon.name})`;
+       item.range = completionRange;
+       item.sortText = `!7${String(index).padStart(3, '0')}`;
+       items.push(item);
+      });
+     } else {
+      const activeDefaults = [...enabledDefaultTerms(), defaultFilterSummary()].filter(Boolean).join(' ');
+      items.push(noMatchesItem(query.draft, completionRange, activeDefaults));
+     }
     }
    return new vscode.CompletionList(items, true);
   },
@@ -2474,15 +2591,58 @@ function isBitmapQueryOutput(query: UnicodeQuery, output: string | undefined): b
  return (!query.representation || query.representation === 'prettyPrint') && !!bitmapOutputFormat(output);
 }
 
-function glyphCompatibilityNotice(entry: UnicodeEntry, targets: CompatibilityTargetSettings, unknownPolicy: CompatibilityFallbackPolicy, profiles: CompatibilityProfiles): { badge?: string; detail?: string } {
+function glyphCompatibilityNotice(entry: UnicodeEntry, targets: CompatibilityTargetSettings, unknownPolicy: CompatibilityFallbackPolicy, profiles: CompatibilityProfiles): { badge?: string; detail?: string; status: string; supported: string; iconCompat: string; excluded?: boolean } {
+ const style = vscode.workspace.getConfiguration('youhavecode').get<CompatibilityBadgeStyle>('compatibilityBadgeStyle', 'symbol');
  const scalarCodepoints = Array.from(entry.character, character => character.codePointAt(0)!).filter(codepoint => codepoint !== 0xFE0E && codepoint !== 0xFE0F);
  const findings = fontCoverageFindings(scalarCodepoints, targets, profiles).concat(emojiCompatibilityFindings(entry.emojiVersion, targets, profiles));
- const badge = compatibilityWarningBadge(findings, profiles);
+ if (findings.some(finding => normalizePolicy(finding.policy) === 'enforced')) {
+  return { excluded: true, status: '', supported: '', iconCompat: '' };
+ }
+ const badge = compatibilityWarningBadge(findings, profiles, style);
  const detail = compatibilityWarningText(findings);
- if (badge || detail) { return { badge, detail }; }
- if (hasCompleteFontCoverageEvidence(targets, profiles) || hasEmojiCompatibilityEvidence(entry.emojiVersion, profiles)) { return {}; }
+ if (badge || detail) {
+  return { badge, detail, status: compatibilityStatusBadges(findings, targets, profiles, style), supported: compatibilitySupportedNames(findings, targets), iconCompat: compatibilityWarningBadge(findings, profiles, 'icon') ?? compatibilityStatusBadges(findings, targets, profiles, 'icon') };
+ }
+ if (hasCompleteFontCoverageEvidence(targets, profiles) || hasEmojiCompatibilityEvidence(entry.emojiVersion, profiles)) {
+  return { status: compatibilityStatusBadges(findings, targets, profiles, style), supported: compatibilitySupportedNames(findings, targets), iconCompat: compatibilityStatusBadges(findings, targets, profiles, 'icon') };
+ }
  const unknownFindings = unknownCompatibilityFindings(targets, profiles, unknownPolicy);
- return { badge: compatibilityWarningBadge(unknownFindings, profiles) ?? unknownCompatibilityWarningBadge(unknownPolicy), detail: compatibilityWarningText(unknownFindings) ?? unknownCompatibilityWarningText(unknownPolicy) };
+ if (unknownFindings.some(finding => normalizePolicy(finding.policy) === 'enforced')) {
+  return { excluded: true, status: '', supported: '', iconCompat: '' };
+ }
+ return {
+  badge: compatibilityWarningBadge(unknownFindings, profiles, style) ?? unknownCompatibilityWarningBadge(unknownPolicy, style),
+  detail: compatibilityWarningText(unknownFindings) ?? unknownCompatibilityWarningText(unknownPolicy),
+  status: compatibilityStatusBadges(unknownFindings, targets, profiles, style),
+  supported: compatibilitySupportedNames(unknownFindings, targets),
+  iconCompat: compatibilityWarningBadge(unknownFindings, profiles, 'icon') ?? unknownCompatibilityWarningBadge(unknownPolicy, 'icon') ?? compatibilityStatusBadges(unknownFindings, targets, profiles, 'icon'),
+ };
+}
+
+// Filter-syntax summary "(key=value - Friendly name)" so each segment doubles as a copyable query token.
+// CompletionItem.detail is rendered as a single line (\n is ignored), so this returns a Markdown bullet
+// list for item.documentation instead, which the suggest widget's docs panel renders as real separate lines.
+function glyphPropertySummary(entry: UnicodeEntry, aliases: UnicodePropertyAliases, compat?: string): vscode.MarkdownString {
+ const segments: [FilterKey, string][] = [['category', entry.category], ['bidi', entry.bidi], ['combining', String(entry.combining)]];
+ const parts = [`(block=${entry.block})`, ...segments.map(([key, value]) => {
+  const friendly = propertyValueDescription(aliases, key, value);
+  return `(${key}=${value}${friendly ? ` - ${friendly}` : ''})`;
+ })];
+ if (compat) { parts.push(`(compat=${compat})`); }
+ return new vscode.MarkdownString(parts.map(part => `- ${part}`).join('\n'), true);
+}
+
+// Min/max codepoint per Unicode block name, derived from the loaded entries rather than a separate ranges dataset.
+function codepointRangesByBlock(entries: readonly UnicodeEntry[]): Map<string, string> {
+ const bounds = new Map<string, [number, number]>();
+ for (const entry of entries) {
+  const codepoint = entry.character.codePointAt(0) ?? Number.parseInt(entry.hex.split('-')[0], 16);
+  const existing = bounds.get(entry.block);
+  if (!existing) { bounds.set(entry.block, [codepoint, codepoint]); }
+  else { existing[0] = Math.min(existing[0], codepoint); existing[1] = Math.max(existing[1], codepoint); }
+ }
+ const hex = (value: number) => `U+${value.toString(16).toUpperCase().padStart(4, '0')}`;
+ return new Map([...bounds].map(([block, [start, end]]) => [block, start === end ? hex(start) : `${hex(start)}..${hex(end)}`]));
 }
 
 async function renderQueryOutput(entry: UnicodeEntry, entries: UnicodeEntry[], query: UnicodeQuery, fallback: DeconstructionFormat, defaults: RenderDefaults, context: vscode.ExtensionContext, leadingText: string): Promise<string> {

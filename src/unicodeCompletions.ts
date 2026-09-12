@@ -463,7 +463,7 @@ function decompositionType(value?: string): string {
  return tagged?.[1].toUpperCase() ?? 'CANONICAL';
 }
 
-function glyphPropertyLabel(key: GlyphPropertyKey): string {
+export function glyphPropertyLabel(key: GlyphPropertyKey): string {
  return { name: 'Name', bidi: 'Bidirectional class', combining: 'Combining class', category: 'Category', decomp: 'Decomposition', unicode: 'Unicode', lang: 'Language', block: 'Block', emoji: 'Emoji presentation' }[key];
 }
 
