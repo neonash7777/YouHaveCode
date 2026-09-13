@@ -130,7 +130,8 @@
             "iphone-blocks",
             "emoji",
             "binary",
-            "hex"
+            "hex",
+            "zalgo"
           ],
           "default": "glyph",
           "description": "Default output format for inserted glyphs. Explicit query options override this setting."
@@ -390,16 +391,16 @@
         "youhavecode.compatibilityBadgeStyle": {
           "type": "string",
           "enum": [
-            "symbol",
+            "icon",
             "letter",
-            "icon"
+            "name"
           ],
           "enumDescriptions": [
-            "Use emoji symbols for compatibility badges (e.g. 🍎️, 🪟️, 🐧️, 🤖️, 📲️).",
-            "Use platform letter abbreviations for compatibility badges (e.g. Ap, Wi, Li, An, iO).",
-            "Use VS Code Product Icons ($(icon)) for compatibility badges."
+            "Use VS Code Product Icons ($(icon)) for compatibility badges.",
+            "Use abbreviated platform names for compatibility badges (e.g. Mac, Wi, Li, An, iOS).",
+            "Use full platform names for compatibility badges (e.g. macOS, Windows, Ubuntu)."
           ],
-          "default": "symbol",
+          "default": "icon",
           "description": "Style used for platform compatibility badges in completion items and details."
         },
         "youhavecode.compatibilityIndicatorMode": {
@@ -414,6 +415,29 @@
           ],
           "default": "warnings",
           "description": "Whether completion items show only what's missing (warnings) or the full per-platform compatibility status."
+        },
+        "youhavecode.prettyPrintOutput": {
+          "type": "string",
+          "enum": [
+            "braille",
+            "block-elements",
+            "iphone-blocks",
+            "emoji",
+            "binary",
+            "hex",
+            "zalgo"
+          ],
+          "enumDescriptions": [
+            "Render pixels as Braille dots (2 × 4 pixels per character).",
+            "Pack 2 × 2 pixels into Unicode Block Elements.",
+            "Render pixels as solid and hollow square cells (■ and □).",
+            "Render pixels as full-color Emoji Art cells.",
+            "Render pixels as 0 and 1 text.",
+            "Pack 4 × 1 pixels into hexadecimal digits.",
+            "Render multi-line combining diacritics art (Zalgo)."
+          ],
+          "default": "braille",
+          "description": "Default bitmap output format for Pretty Print operations."
         },
         "youhavecode.bitmapSize": {
           "type": "integer",
@@ -514,6 +538,25 @@
           ],
           "default": "identity",
           "description": "Geometric D4 transform applied to each glyph raster before text packing."
+        },
+        "youhavecode.zalgoStrategy": {
+          "type": "string",
+          "enum": [
+            "sculpt",
+            "detailed",
+            "calculated",
+            "hatching",
+            "fast"
+          ],
+          "enumDescriptions": [
+            "3-Base Glyphs reconstructive sculptor using up to 12 vertical tiers of combining marks.",
+            "Micro-ligatures and dense diacritic clusters (|̠̠̩̤̤...).",
+            "Structural bridges and nodes with spanning horizontal breves.",
+            "Grayscale and optical density emulation via overlay strokes and slashes.",
+            "Lightweight 4-bit bitfield scanlines."
+          ],
+          "default": "sculpt",
+          "description": "Rendering strategy used when generating Zalgo / Combining Art."
         },
         "youhavecode.customArtProfiles": {
           "type": "array",
@@ -724,6 +767,48 @@
         "command": "youhavecode.quickSidebarPrettyPrint",
         "title": "Pretty Print",
         "icon": "$(play)",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.longPrettyPrintZalgo",
+        "title": "Long Drawing Solver (Combining Marks)",
+        "icon": "$(sparkle)",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.prettyPrintImageZalgo",
+        "title": "Pretty Print Image with Zalgo (Combining Marks)",
+        "icon": "$(sparkle)",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.setZalgoStrategySculpt",
+        "title": "Render Zalgo: Sculpt (3-Base Glyphs)",
+        "icon": "$(sparkle)",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.setZalgoStrategyDetailed",
+        "title": "Render Zalgo: Detailed (Micro-ligatures)",
+        "icon": "$(symbol-structure)",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.setZalgoStrategyCalculated",
+        "title": "Render Zalgo: Calculated (Bridges & Nodes)",
+        "icon": "$(git-merge)",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.setZalgoStrategyHatching",
+        "title": "Render Zalgo: Hatching (Grayscale Mesh)",
+        "icon": "$(symbol-misc)",
+        "category": "YouHaveCode"
+      },
+      {
+        "command": "youhavecode.setZalgoStrategyFast",
+        "title": "Render Zalgo: Fast (4-bit scanlines)",
+        "icon": "$(zap)",
         "category": "YouHaveCode"
       },
       {
@@ -1001,8 +1086,65 @@
         },
         {
           "command": "youhavecode.quickSidebarPrettyPrint",
-          "when": "view == youhavecode.unicode && viewItem == youhavecode.prettyPrintOutputChoice",
-          "group": "inline"
+          "when": "view == youhavecode.unicode && (viewItem == youhavecode.prettyPrintOutputChoice || viewItem == youhavecode.prettyPrintOutputChoice.zalgo || viewItem == youhavecode.outputFormatChoice || viewItem == youhavecode.outputFormatChoice.zalgo)",
+          "group": "inline",
+          "alt": "youhavecode.longPrettyPrintZalgo"
+        },
+        {
+          "command": "youhavecode.quickSidebarPrettyPrint",
+          "when": "view == youhavecode.unicode && (viewItem == youhavecode.prettyPrintOutputChoice || viewItem == youhavecode.outputFormatChoice)",
+          "group": "1_output@1"
+        },
+        {
+          "command": "youhavecode.quickSidebarPrettyPrint",
+          "when": "view == youhavecode.unicode && (viewItem == youhavecode.prettyPrintOutputChoice.zalgo || viewItem == youhavecode.outputFormatChoice.zalgo)",
+          "group": "1_zalgo@1"
+        },
+        {
+          "command": "youhavecode.longPrettyPrintZalgo",
+          "when": "view == youhavecode.unicode && (viewItem == youhavecode.prettyPrintOutputChoice.zalgo || viewItem == youhavecode.outputFormatChoice.zalgo)",
+          "group": "1_zalgo@2"
+        },
+        {
+          "command": "youhavecode.setZalgoStrategySculpt",
+          "when": "view == youhavecode.unicode && (viewItem == youhavecode.prettyPrintOutputChoice.zalgo || viewItem == youhavecode.outputFormatChoice.zalgo)",
+          "group": "2_zalgo_strategy@1"
+        },
+        {
+          "command": "youhavecode.setZalgoStrategyDetailed",
+          "when": "view == youhavecode.unicode && (viewItem == youhavecode.prettyPrintOutputChoice.zalgo || viewItem == youhavecode.outputFormatChoice.zalgo)",
+          "group": "2_zalgo_strategy@2"
+        },
+        {
+          "command": "youhavecode.setZalgoStrategyCalculated",
+          "when": "view == youhavecode.unicode && (viewItem == youhavecode.prettyPrintOutputChoice.zalgo || viewItem == youhavecode.outputFormatChoice.zalgo)",
+          "group": "2_zalgo_strategy@3"
+        },
+        {
+          "command": "youhavecode.setZalgoStrategyHatching",
+          "when": "view == youhavecode.unicode && (viewItem == youhavecode.prettyPrintOutputChoice.zalgo || viewItem == youhavecode.outputFormatChoice.zalgo)",
+          "group": "2_zalgo_strategy@4"
+        },
+        {
+          "command": "youhavecode.setZalgoStrategyFast",
+          "when": "view == youhavecode.unicode && (viewItem == youhavecode.prettyPrintOutputChoice.zalgo || viewItem == youhavecode.outputFormatChoice.zalgo)",
+          "group": "2_zalgo_strategy@5"
+        },
+        {
+          "command": "youhavecode.prettyPrintImage",
+          "when": "view == youhavecode.unicode && viewItem == youhavecode.prettyPrintImage",
+          "group": "inline",
+          "alt": "youhavecode.prettyPrintImageZalgo"
+        },
+        {
+          "command": "youhavecode.prettyPrintImage",
+          "when": "view == youhavecode.unicode && viewItem == youhavecode.prettyPrintImage",
+          "group": "1_image@1"
+        },
+        {
+          "command": "youhavecode.prettyPrintImageZalgo",
+          "when": "view == youhavecode.unicode && viewItem == youhavecode.prettyPrintImage",
+          "group": "1_image@2"
         },
         {
           "command": "youhavecode.customArtSelection",

@@ -2,15 +2,15 @@ import * as vscode from 'vscode';
 import { actionKeys, applyCustomTagEdits, buildNameWords, canonicalFilterKey, countFilterValues, countMatchingWords, filterInputKeys, filterKeys, filterValues, glyphPropertyExpansions, glyphPropertyInputLabels, initialEntries, literalNameWords, matchingEntries, matchingWords, optionValues, outputValues, parseUnicodeQuery, propertyValue, queryOption, shouldRetriggerAfterEdit, suggestedOptionKeys, topMatchingWords, withDefaultFilters, type DefaultFilterConfig, type FilterKey, type OptionKey, type UnicodeOption, type UnicodeQuery, type UnicodeTagEdit } from './unicodeCompletions';
 import { mergeEmojiEntries, parseCompactUnicode, parseEmojiRgi, parseUnicodePropertyAliases, propertyValueDescription, type UnicodeEntry, type UnicodePropertyAliases } from './unicodeData';
 import { applyEmojiPresentation, deconstructUnicode, renderCodepointReference, renderHtmlEntity, renderLanguageEscape, renderUnicode, replacementOffsets, type DeconstructionFormat, type EmojiPresentation } from './unicodeDeconstruction';
-import { bitmapTextDimensions, startBitmapOnNewLine, textToBitmap, textToCustomArt, transformLayout, type BitmapD4, type BitmapFlowDirection, type BitmapTextFormat, type BitmapWrapDirection, type CustomArtProfile } from './unicodeBraille';
+import { bitmapTextDimensions, optimizeCombiningArt, startBitmapOnNewLine, textToBitmap, textToCustomArt, transformLayout, type BitmapD4, type BitmapFlowDirection, type BitmapTextFormat, type BitmapWrapDirection, type CustomArtProfile, type ZalgoStrategy } from './unicodeBraille';
 import { defaultPrettyPrintFontFamilies, enumerateFontRenderings, glyphIconPng, installedFontFamilies, parseFontFamilyList, rasterizeEmojiArt, rasterizeGlyph, rasterizeGlyphBaseline, rasterizeGlyphBaselineTight, rasterizeGlyphBaselineTightForFamily, rasterizeGlyphBaselineForFamily, rasterizeGlyphForFamily, rasterizeImage, rasterizeImageEmojiArt, setPrettyPrintFontFamilies } from './glyphRaster';
 import { emptyUsageStats, glyphVariantKey, orderFilterValues, parseGlyphVariantKey, rankCustomTags, rankGlyphHexes, recentFilterValues, recordGlyph, recordTokens, recordUsageValue, resetUsageStats, type UsageRecord, type UsageStats } from './usageRanking';
 import { UnicodeSidebarProvider } from './unicodeSidebar';
 import { builtInDelegateProfiles, resolveDelegateProfile, type DelegateProfileConfig } from './delegateSandbox';
 import { matchingProductIcons, parseProductIcons, type ProductIcon } from './productIcons';
-import { compatibilityDraftAliases, compatibilityStatusBadges, compatibilitySummary, compatibilitySupportedNames, compatibilityTargets, compatibilityWarningBadge, compatibilityWarningText, emojiCompatibilityFindings, fallbackCompatibilityProfiles, fontCoverageFindings, getTargetCodicon, getTargetSymbol, hasCompleteFontCoverageEvidence, hasEmojiCompatibilityEvidence, normalizePolicy, parseCompatibilityProfiles, resolveCompatibilityTargets, unknownCompatibilityFindings, unknownCompatibilityWarningBadge, unknownCompatibilityWarningText, unsupportedGlyphCount, type CompatibilityBadgeStyle, type CompatibilityFallbackPolicy, type CompatibilityPolicy, type CompatibilityProfiles, type CompatibilityTarget, type CompatibilityTargetSettings } from './compatibilitySettings';
+import { compatibilityDraftAliases, compatibilityStatusBadges, compatibilitySummary, compatibilitySupportedList, compatibilitySupportedTokens, compatibilityTargets, compatibilityWarningBadge, compatibilityWarningText, emojiCompatibilityFindings, fallbackCompatibilityProfiles, fontCoverageFindings, hasCompleteFontCoverageEvidence, hasEmojiCompatibilityEvidence, iconGlyph, normalizeBadgeStyle, normalizePolicy, parseCompatibilityProfiles, resolveCompatibilityTargets, targetLetterBadges, unknownCompatibilityFindings, unknownCompatibilityWarningBadge, unknownCompatibilityWarningText, unsupportedGlyphCount, type CompatibilityBadgeStyle, type CompatibilityFallbackPolicy, type CompatibilityPolicy, type CompatibilityProfiles, type CompatibilityTarget, type CompatibilityTargetSettings } from './compatibilitySettings';
 
-export interface RenderDefaults { render: string; size: string; wrap: string; compact: string; mapping?: string; flow: string; 'wrap-direction': string; d4: string }
+export interface RenderDefaults { render: string; size: string; wrap: string; compact: string; mapping?: string; flow: string; 'wrap-direction': string; d4: string; 'zalgo-strategy': ZalgoStrategy }
 interface UtilityAction { key: 'recent' | 'frequent' | 'customTags' | 'properties' | 'defaultFilters' | 'compatibility' | 'settings' | 'outputFormat'; label: string; terms: readonly string[]; command: string; commandTitle: string; commandArguments?: readonly unknown[]; kind: vscode.CompletionItemKind; rootSort: string }
 export interface SelectionOutputChoice { label: string; description: string; format: DeconstructionFormat | BitmapTextFormat | 'lastBitmap' | 'quickBitmap' | 'customBitmap' }
 interface BackQuickPickItem extends vscode.QuickPickItem { back: true }
@@ -62,6 +62,7 @@ export function selectionOutputChoices(lastOutput: string, defaults?: RenderDefa
   { label: 'Emoji Art', description: '1 × 1 pixel per colored emoji cell', format: 'emoji' },
   { label: 'Binary', description: '1 × 1 pixel per 0 or 1', format: 'binary' },
   { label: 'Hex', description: '4 × 1 pixels per hexadecimal digit', format: 'hex' },
+  { label: 'Zalgo / Combining Art', description: 'Multi-line combining diacritics art', format: 'zalgo' },
   { label: 'Glyph / symbol', description: 'Keep the selected Unicode text', format: 'symbols' },
   { label: 'Glyph components', description: 'Break graphemes and emoji into encoded parts', format: 'components' },
   { label: 'Details', description: '‽ U+203D INTERROBANG', format: 'details' },
@@ -100,6 +101,7 @@ async function chooseBitmapSettings(mode: 'quickBitmap' | 'customBitmap', lastOu
     { label: 'Emoji Art', description: `1 × 1 pixel per colored emoji cell${settings.format === 'emoji' ? ' (currently selected)' : ''}`, format: 'emoji' as const },
     { label: 'Binary', description: `1 × 1 pixel per 0 or 1${settings.format === 'binary' ? ' (currently selected)' : ''}`, format: 'binary' as const },
     { label: 'Hex', description: `4 × 1 pixels per hexadecimal digit${settings.format === 'hex' ? ' (currently selected)' : ''}`, format: 'hex' as const },
+    { label: 'Zalgo / Combining Art', description: `Multi-line combining diacritics art${settings.format === 'zalgo' ? ' (currently selected)' : ''}`, format: 'zalgo' as const },
    ], { title: `${mode === 'quickBitmap' ? 'Pretty Print' : 'Pretty Print*'} › Type`, placeHolder: 'Choose how raster pixels are packed into text' }, false);
   if (!output || output === 'back') { return undefined; }
    settings.format = output.format;
@@ -203,6 +205,7 @@ const propertyFilters: ReadonlyArray<{ key: FilterKey; label: string; descriptio
  { key: 'lang', label: 'Language family', description: 'Language/script family; alias: language' },
  { key: 'block', label: 'Unicode block', description: 'Named Unicode code-point block' },
  { key: 'emoji', label: 'Emoji presentation', description: 'Color emoji, text emoji, or non-emoji' },
+ { key: 'compat', label: 'Compatibility', description: 'Platform emoji version support (e.g. ALL, E15.0, E15.1, E16.0); alias: compatibility' },
 ];
 const utilityActions: readonly UtilityAction[] = [
  { key: 'recent', label: 'Recent…', terms: ['recent', 'recents', 'history'], command: 'youhavecode.insertRecentGlyph', commandTitle: 'Show recent glyphs', kind: vscode.CompletionItemKind.Folder, rootSort: '!50' },
@@ -380,7 +383,7 @@ export async function activate(context: vscode.ExtensionContext) {
   prettyPrintDefaults: () => {
    const defaults = configuredRenderDefaults(context);
   const bitmapFormat = bitmapOutputFormat(defaults.render);
-  return { output: bitmapFormat ? bitmapOutputValue(bitmapFormat) : 'braille', size: defaults.size, wrap: defaults.wrap, compact: defaults.compact, mapping: defaults.mapping ?? 'baseline', flow: defaults.flow, 'wrap-direction': defaults['wrap-direction'], d4: defaults.d4 };
+  return { output: bitmapFormat ? bitmapOutputValue(bitmapFormat) : 'braille', size: defaults.size, wrap: defaults.wrap, compact: defaults.compact, mapping: defaults.mapping ?? 'baseline', flow: defaults.flow, 'wrap-direction': defaults['wrap-direction'], d4: defaults.d4, 'zalgo-strategy': defaults['zalgo-strategy'] ?? 'detailed' };
   },
   prettyPrintFontFamilies: () => {
    const state = fontPreferenceState();
@@ -404,7 +407,7 @@ export async function activate(context: vscode.ExtensionContext) {
    targets: configuredCompatibilityTargets(),
    unknown: configuredCompatibilityFallback('compatibilityUnknownPolicy'),
    localFont: configuredCompatibilityFallback('compatibilityLocalFontPolicy'),
-   badgeStyle: vscode.workspace.getConfiguration('youhavecode').get<CompatibilityBadgeStyle>('compatibilityBadgeStyle', 'symbol'),
+   badgeStyle: normalizeBadgeStyle(vscode.workspace.getConfiguration('youhavecode').get<string>('compatibilityBadgeStyle', 'icon')),
   }),
   compatibilityProfiles: loadCompatibilityProfiles,
   renderGlyphOutput: async (hex, presentation) => {
@@ -413,6 +416,7 @@ export async function activate(context: vscode.ExtensionContext) {
    const resolvedPresentation = presentation ?? vscode.workspace.getConfiguration('youhavecode').get<EmojiPresentation>('emojiPresentation', 'auto');
    return renderUnicode(entry.character, await loadEntries(), insertionFormat, resolvedPresentation);
   },
+  recordDragUsage: async (hex, presentation) => { await recordUsage(hex, presentation); },
  });
  const emojiPresentation = () => vscode.workspace.getConfiguration('youhavecode').get<EmojiPresentation>('emojiPresentation', 'auto');
  const presentedCharacter = (character: string, presentation = emojiPresentation()) => applyEmojiPresentation(character, presentation);
@@ -988,18 +992,54 @@ export async function activate(context: vscode.ExtensionContext) {
   vscode.commands.registerCommand('youhavecode.setSidebarPrettyPrintSetting', async (setting: string, value: string) => {
    const configuration = vscode.workspace.getConfiguration('youhavecode');
    const settings: Readonly<Record<string, readonly string[]>> = {
-    output: ['braille', 'block-elements', 'iphone-blocks', 'emoji', 'binary', 'hex'], size: ['8x8', '12x12', '16x16', '24x24', '32x32', '48x48', '64x64', '96x96', '128x128'], wrap: ['none', 'glyph', 'auto', '16', '32', '40', '80', '120'], compact: ['on', 'off'], mapping: ['square', 'baseline', 'baseline-tight'], flow: ['auto', 'lr', 'rl', 'ud', 'du'], 'wrap-direction': ['auto', 'ud', 'du', 'lr', 'rl'], d4: ['identity', 'rotate-90', 'rotate-180', 'rotate-270', 'mirror-left-right', 'flip-top-bottom', 'reflect-slash', 'reflect-backslash'],
+    output: ['braille', 'block-elements', 'iphone-blocks', 'emoji', 'binary', 'hex', 'zalgo'], size: ['8x8', '12x12', '16x16', '24x24', '32x32', '48x48', '64x64', '96x96', '128x128'], wrap: ['none', 'glyph', 'auto', '16', '32', '40', '80', '120'], compact: ['on', 'off'], mapping: ['square', 'baseline', 'baseline-tight'], flow: ['auto', 'lr', 'rl', 'ud', 'du'], 'wrap-direction': ['auto', 'ud', 'du', 'lr', 'rl'], d4: ['identity', 'rotate-90', 'rotate-180', 'rotate-270', 'mirror-left-right', 'flip-top-bottom', 'reflect-slash', 'reflect-backslash'],
+    'zalgo-strategy': ['sculpt', 'detailed', 'calculated', 'hatching', 'fast'],
    };
    if (!settings[setting]?.includes(value)) { return; }
     const currentFlow = configuration.get<string>('bitmapFlowDirection', 'auto');
     if (setting === 'wrap-direction' && (currentFlow === 'auto' || value !== 'auto' && (['lr', 'rl'].includes(value) === ['lr', 'rl'].includes(currentFlow)))) { return; }
-    const updates: Readonly<Record<string, unknown>> = { output: value, size: Number.parseInt(value, 10), wrap: value === 'none' ? -1 : value === 'glyph' ? -2 : value === 'auto' ? 0 : Number.parseInt(value, 10), compact: value === 'on', mapping: value, flow: value, 'wrap-direction': value, d4: value };
-     const keys: Readonly<Record<string, string>> = { output: 'defaultOutput', size: 'bitmapSize', wrap: 'bitmapWrapLimit', compact: 'bitmapCompact', mapping: 'bitmapGlyphMapping', flow: 'bitmapFlowDirection', 'wrap-direction': 'bitmapWrapDirection', d4: 'bitmapD4' };
+    const updates: Readonly<Record<string, unknown>> = { output: value, size: Number.parseInt(value, 10), wrap: value === 'none' ? -1 : value === 'glyph' ? -2 : value === 'auto' ? 0 : Number.parseInt(value, 10), compact: value === 'on', mapping: value, flow: value, 'wrap-direction': value, d4: value, 'zalgo-strategy': value };
+     const keys: Readonly<Record<string, string>> = { output: 'prettyPrintOutput', size: 'bitmapSize', wrap: 'bitmapWrapLimit', compact: 'bitmapCompact', mapping: 'bitmapGlyphMapping', flow: 'bitmapFlowDirection', 'wrap-direction': 'bitmapWrapDirection', d4: 'bitmapD4', 'zalgo-strategy': 'zalgoStrategy' };
   const axisChanged = setting === 'flow' && (value === 'auto' || currentFlow === 'auto' || ['lr', 'rl'].includes(value) !== ['lr', 'rl'].includes(currentFlow));
   await Promise.all([configuration.update(keys[setting], updates[setting], effectiveConfigurationTarget(keys[setting])), ...(axisChanged ? [configuration.update('bitmapWrapDirection', 'auto', effectiveConfigurationTarget('bitmapWrapDirection'))] : [])]);
    renderDefaults = configuredRenderDefaults(context);
-  sidebar.refreshPrettyPrintSetting(setting as 'output' | 'size' | 'wrap' | 'compact' | 'mapping' | 'flow' | 'wrap-direction' | 'd4');
+  sidebar.refreshPrettyPrintSetting(setting as 'output' | 'size' | 'wrap' | 'compact' | 'mapping' | 'flow' | 'wrap-direction' | 'd4' | 'zalgo-strategy');
   if (axisChanged) { sidebar.refreshPrettyPrintSetting('wrap-direction'); }
+  }),
+  vscode.commands.registerCommand('youhavecode.setZalgoStrategySculpt', async () => {
+   await vscode.commands.executeCommand('youhavecode.setSidebarPrettyPrintSetting', 'zalgo-strategy', 'sculpt');
+   if (vscode.window.activeTextEditor?.selections.some(s => !s.isEmpty)) {
+    await vscode.commands.executeCommand('youhavecode.longPrettyPrintZalgo');
+   }
+   await vscode.window.setStatusBarMessage('Zalgo Style set to Sculpt (3-Base Glyphs)', 2500);
+  }),
+  vscode.commands.registerCommand('youhavecode.setZalgoStrategyDetailed', async () => {
+   await vscode.commands.executeCommand('youhavecode.setSidebarPrettyPrintSetting', 'zalgo-strategy', 'detailed');
+   if (vscode.window.activeTextEditor?.selections.some(s => !s.isEmpty)) {
+    await vscode.commands.executeCommand('youhavecode.longPrettyPrintZalgo');
+   }
+   await vscode.window.setStatusBarMessage('Zalgo Style set to Detailed (Micro-ligatures)', 2500);
+  }),
+  vscode.commands.registerCommand('youhavecode.setZalgoStrategyCalculated', async () => {
+   await vscode.commands.executeCommand('youhavecode.setSidebarPrettyPrintSetting', 'zalgo-strategy', 'calculated');
+   if (vscode.window.activeTextEditor?.selections.some(s => !s.isEmpty)) {
+    await vscode.commands.executeCommand('youhavecode.longPrettyPrintZalgo');
+   }
+   await vscode.window.setStatusBarMessage('Zalgo Style set to Calculated (Bridges & Nodes)', 2500);
+  }),
+  vscode.commands.registerCommand('youhavecode.setZalgoStrategyHatching', async () => {
+   await vscode.commands.executeCommand('youhavecode.setSidebarPrettyPrintSetting', 'zalgo-strategy', 'hatching');
+   if (vscode.window.activeTextEditor?.selections.some(s => !s.isEmpty)) {
+    await vscode.commands.executeCommand('youhavecode.longPrettyPrintZalgo');
+   }
+   await vscode.window.setStatusBarMessage('Zalgo Style set to Hatching (Grayscale Mesh)', 2500);
+  }),
+  vscode.commands.registerCommand('youhavecode.setZalgoStrategyFast', async () => {
+   await vscode.commands.executeCommand('youhavecode.setSidebarPrettyPrintSetting', 'zalgo-strategy', 'fast');
+   if (vscode.window.activeTextEditor?.selections.some(s => !s.isEmpty)) {
+    await vscode.commands.executeCommand('youhavecode.longPrettyPrintZalgo');
+   }
+   await vscode.window.setStatusBarMessage('Zalgo Style set to Fast (4-bit scanlines)', 2500);
   }),
   vscode.commands.registerCommand('youhavecode.copyEditorFontFamilyToPrettyPrint', async () => {
    const editorFamilies = vscode.workspace.getConfiguration('editor', vscode.window.activeTextEditor?.document.uri).get<string>('fontFamily', '').trim();
@@ -1055,8 +1095,40 @@ export async function activate(context: vscode.ExtensionContext) {
    await movePrettyPrintFontFamily(item, 'bottom');
   }),
   vscode.commands.registerCommand('youhavecode.quickSidebarPrettyPrint', async (item: { prettyPrintOutput?: string }) => {
-   const format = item.prettyPrintOutput && bitmapOutputFormat(item.prettyPrintOutput);
-   if (format) { await vscode.commands.executeCommand('youhavecode.prettyPrintSelectionAs', format); }
+   const output = item?.prettyPrintOutput;
+   if (!output) { return; }
+   const format = bitmapOutputFormat(output);
+   if (format) {
+    await vscode.commands.executeCommand('youhavecode.prettyPrintSelectionAs', format);
+   } else {
+    const textFormat = outputFormat(output, 'symbols');
+    await vscode.commands.executeCommand('youhavecode.chooseInsertionFormat', textFormat);
+   }
+  }),
+  vscode.commands.registerCommand('youhavecode.longPrettyPrintZalgo', async () => {
+   const editor = vscode.window.activeTextEditor;
+   if (!editor) { await vscode.window.showWarningMessage('Open a text editor before running the Long Drawing Solver.'); return; }
+   const targets = editor.selections.filter(selection => !selection.isEmpty).map(range => ({ range, text: editor.document.getText(range) }));
+   const rawText = targets.length ? targets.map(target => target.text).join('') : (await vscode.env.clipboard.readText() || '🦁️');
+   const text = rawText.trim() || '🦁️';
+   const defaults = configuredRenderDefaults(context);
+   const size = Number.parseInt(defaults.size, 10) || 32;
+   const rasterizer = bitmapRasterizer(defaults.mapping);
+   const layout = resolvedBitmapLayout(defaults);
+   const maxExtent = defaults.wrap === 'none' || defaults.wrap === 'glyph' ? undefined : defaults.wrap === 'auto' ? vscode.workspace.getConfiguration('editor', editor.document.uri).get('wordWrapColumn', 80) : Number.parseInt(defaults.wrap, 10);
+   const output = await textToBitmap(text, size, 'zalgo', {
+    compact: defaults.compact === 'on',
+    maxExtent,
+    oneGlyphPerGroup: defaults.wrap === 'glyph',
+    zalgoStrategy: defaults['zalgo-strategy'] ?? 'detailed',
+    ...layout,
+   }, rasterizer);
+   if (targets.length) {
+    await editor.edit(builder => targets.forEach(target => builder.replace(target.range, output)));
+   } else {
+    await editor.edit(builder => editor.selections.forEach(selection => builder.replace(selection, output)));
+   }
+   await vscode.window.setStatusBarMessage('🎨 Generated Combining Art with Long Drawing Solver', 3000);
   }),
   vscode.commands.registerCommand('youhavecode.prettyPrintWithDefaults', async () => {
    const editor = vscode.window.activeTextEditor;
@@ -1077,39 +1149,49 @@ export async function activate(context: vscode.ExtensionContext) {
     await vscode.window.showErrorMessage(`Could not pretty print clipboard text. ${error instanceof Error ? error.message : String(error)}`);
    }
   }),
-  vscode.commands.registerCommand('youhavecode.prettyPrintImage', () => {
+  vscode.commands.registerCommand('youhavecode.prettyPrintImageZalgo', () => {
+   void vscode.commands.executeCommand('youhavecode.prettyPrintImage', 'zalgo');
+  }),
+  vscode.commands.registerCommand('youhavecode.prettyPrintImage', (mode?: 'default' | 'zalgo' | unknown) => {
     const targetEditor = vscode.window.activeTextEditor;
     if (!targetEditor) { return; }
     const targetSelections = targetEditor.selections.map(selection => ({
      start: selection.start,
      end: selection.end,
     }));
-   const panel = vscode.window.createWebviewPanel('youhavecode.prettyPrintImage', 'Pretty Print Image', vscode.ViewColumn.Active, { enableScripts: true });
+    const isZalgoMode = mode === 'zalgo';
+   const panel = vscode.window.createWebviewPanel('youhavecode.prettyPrintImage', isZalgoMode ? 'Pretty Print Image (Zalgo)' : 'Pretty Print Image', vscode.ViewColumn.Active, { enableScripts: true });
   panel.webview.html = `<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
-  :root{color-scheme:light dark;--panel:var(--vscode-editorWidget-background,#252526);--border:var(--vscode-input-border,#616161);--muted:var(--vscode-descriptionForeground,#9d9d9d);--accent:var(--vscode-focusBorder,#007fd4);--text:var(--vscode-foreground,#cccccc)}*{box-sizing:border-box}body{margin:0;padding:24px;background:var(--vscode-editor-background,#1e1e1e);color:var(--text);font:13px var(--vscode-font-family,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif)}main{max-width:680px;margin:0 auto}.heading{display:flex;align-items:center;gap:12px;margin-bottom:18px}.heading-icon{display:grid;place-items:center;width:36px;height:36px;border-radius:8px;background:var(--vscode-textLink-foreground,#3794ff);color:#fff;font-size:20px}.heading h1{margin:0;font-size:18px;font-weight:600}.heading p{margin:3px 0 0;color:var(--muted)}.drop{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:250px;padding:28px;border:1px dashed var(--border);border-radius:10px;background:color-mix(in srgb,var(--panel) 78%,transparent);text-align:center;cursor:pointer;transition:border-color .15s,background .15s}.drop:hover,.drop.over{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--panel))}.drop-icon{font-size:38px;line-height:1;margin-bottom:14px}.drop strong{font-size:15px}.drop span{margin-top:7px;color:var(--muted)}button{margin-top:18px;padding:7px 14px;border:1px solid var(--border);border-radius:5px;background:var(--vscode-button-background,#0e639c);color:var(--vscode-button-foreground,#fff);font:inherit;cursor:pointer}button:hover{background:var(--vscode-button-hoverBackground,#1177bb)}button:focus-visible,.drop:focus-visible{outline:2px solid var(--accent);outline-offset:2px}.preview{display:none;overflow:hidden;border:1px solid var(--border);border-radius:10px;background:var(--panel)}.preview.ready{display:block}.preview img{display:block;width:100%;max-height:420px;object-fit:contain;background:repeating-conic-gradient(#333 0 25%,#222 0 50%) 50%/16px 16px;padding:12px}.meta{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 14px;border-top:1px solid var(--border);color:var(--muted)}.meta strong{overflow:hidden;color:var(--text);font-weight:500;text-overflow:ellipsis;white-space:nowrap}.status{min-height:20px;margin:14px 2px 0;color:var(--muted)}.status.error{color:var(--vscode-errorForeground,#f48771)}.actions{display:none;justify-content:flex-end;gap:8px}.actions.ready{display:flex}.actions button{margin-top:0}.secondary{background:transparent;color:var(--text)}
-  </style></head><body><main><header class="heading"><div class="heading-icon" aria-hidden="true">▧</div><div><h1>Pretty Print Image</h1><p>Choose an image to convert with your current Pretty Print settings.</p></div></header><section id="drop" class="drop" role="button" tabindex="0" aria-label="Drop an image here or browse for an image"><div class="drop-icon" aria-hidden="true">▧</div><strong>Drop an image here</strong><span>or browse for a PNG, JPEG, WebP, or GIF</span><button id="browse" type="button">Browse…</button></section><section id="preview" class="preview" aria-live="polite"><img id="previewImage" alt="Selected image preview"><div class="meta"><strong id="fileName">Selected image</strong><span id="fileSize"></span></div></section><div id="status" class="status" role="status">Nothing selected</div><div id="actions" class="actions"><button id="replace" class="secondary" type="button">Choose another</button><button id="use" type="button">Use image</button></div><input id="file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden aria-label="Choose an image"></main><script>const vscode=acquireVsCodeApi(),file=document.getElementById('file'),drop=document.getElementById('drop'),browse=document.getElementById('browse'),preview=document.getElementById('preview'),previewImage=document.getElementById('previewImage'),fileName=document.getElementById('fileName'),fileSize=document.getElementById('fileSize'),status=document.getElementById('status'),actions=document.getElementById('actions'),use=document.getElementById('use'),replace=document.getElementById('replace');let selected;const size=n=>n<1024?n+' B':n<1048576?(n/1024).toFixed(1)+' KB':(n/1048576).toFixed(1)+' MB';const choose=()=>file.click();const setStatus=(text,error=false)=>{status.textContent=text;status.className='status'+(error?' error':'')};const load=f=>{if(!f)return;if(!f.type.startsWith('image/')){setStatus('Please choose an image file.',true);return}selected=f;previewImage.src=URL.createObjectURL(f);fileName.textContent=f.name;fileSize.textContent=size(f.size);preview.className='preview ready';actions.className='actions ready';setStatus('Ready to use');};const send=()=>{if(!selected)return;use.disabled=true;replace.disabled=true;setStatus('Processing image…');const reader=new FileReader();reader.onload=()=>vscode.postMessage({image:Array.from(new Uint8Array(reader.result))});reader.onerror=()=>{use.disabled=false;replace.disabled=false;setStatus('Could not read that image.',true)};reader.readAsArrayBuffer(selected)};file.onchange=()=>load(file.files[0]);browse.onclick=e=>{e.stopPropagation();choose()};replace.onclick=()=>{file.value='';choose()};use.onclick=send;drop.onclick=e=>{if(e.target!==browse)choose()};drop.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choose()}};['dragenter','dragover'].forEach(type=>drop.addEventListener(type,e=>{e.preventDefault();drop.classList.add('over')}));['dragleave','drop'].forEach(type=>drop.addEventListener(type,e=>{e.preventDefault();drop.classList.remove('over')}));drop.addEventListener('drop',e=>load(e.dataTransfer.files[0]));</script></body></html>`;
+  :root{color-scheme:light dark;--panel:var(--vscode-editorWidget-background,#252526);--border:var(--vscode-input-border,#616161);--muted:var(--vscode-descriptionForeground,#9d9d9d);--accent:var(--vscode-focusBorder,#007fd4);--text:var(--vscode-foreground,#cccccc)}*{box-sizing:border-box}body{margin:0;padding:24px;background:var(--vscode-editor-background,#1e1e1e);color:var(--text);font:13px var(--vscode-font-family,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif)}main{max-width:680px;margin:0 auto}.heading{display:flex;align-items:center;gap:12px;margin-bottom:18px}.heading-icon{display:grid;place-items:center;width:36px;height:36px;border-radius:8px;background:var(--vscode-textLink-foreground,#3794ff);color:#fff;font-size:20px}.heading h1{margin:0;font-size:18px;font-weight:600}.heading p{margin:3px 0 0;color:var(--muted)}.drop{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:250px;padding:28px;border:1px dashed var(--border);border-radius:10px;background:color-mix(in srgb,var(--panel) 78%,transparent);text-align:center;cursor:pointer;transition:border-color .15s,background .15s}.drop:hover,.drop.over{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--panel))}.drop-icon{font-size:38px;line-height:1;margin-bottom:14px}.drop strong{font-size:15px}.drop span{margin-top:7px;color:var(--muted)}button{margin-top:18px;padding:7px 14px;border:1px solid var(--border);border-radius:5px;background:var(--vscode-button-background,#0e639c);color:var(--vscode-button-foreground,#fff);font:inherit;cursor:pointer}button:hover{background:var(--vscode-button-hoverBackground,#1177bb)}button:focus-visible,.drop:focus-visible{outline:2px solid var(--accent);outline-offset:2px}.status{margin-top:14px;color:var(--muted);text-align:center}.status.error{color:var(--vscode-errorForeground,#f48771)}input[type="file"]{display:none}</style></head><body><main><header class="heading"><div class="heading-icon" aria-hidden="true">▧</div><div><h1>${isZalgoMode ? 'Pretty Print Image (Zalgo Combining Art)' : 'Pretty Print Image'}</h1><p>${isZalgoMode ? 'Drop an image to immediately convert it using high-quality combining marks.' : 'Drop an image to immediately convert it with your current Pretty Print settings.'}</p></div></header><section id="drop" class="drop" role="button" tabindex="0" aria-label="Drop an image here or browse for an image"><div class="drop-icon" aria-hidden="true">▧</div><strong>Drop an image here</strong><span>or browse for a PNG, JPEG, WebP, or GIF</span><button id="browse" type="button">Browse…</button></section><div id="status" class="status" role="status">Drop image to convert immediately</div><input id="file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden aria-label="Choose an image"></main><script>const vscode=acquireVsCodeApi(),file=document.getElementById('file'),drop=document.getElementById('drop'),browse=document.getElementById('browse'),status=document.getElementById('status');const choose=()=>file.click();const setStatus=(text,error=false)=>{status.textContent=text;status.className='status'+(error?' error':'')};const load=f=>{if(!f)return;if(!f.type.startsWith('image/')){setStatus('Please choose an image file.',true);return}setStatus('Processing image…');f.arrayBuffer().then(buffer=>{vscode.postMessage({image:Array.from(new Uint8Array(buffer))})})};drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('over')});drop.addEventListener('dragleave',()=>drop.classList.remove('over'));drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('over');const f=e.dataTransfer&&e.dataTransfer.files[0];if(f)load(f)});browse.addEventListener('click',choose);drop.addEventListener('click',e=>{if(e.target!==browse)choose()});drop.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choose()}});file.addEventListener('change',()=>{const f=file.files&&file.files[0];if(f)load(f)});</script></body></html>`;
    panel.webview.onDidReceiveMessage(async (message: { image?: number[] }) => {
     if (!message.image?.length) { return; }
     try {
      const editor = targetEditor;
      const defaults = configuredRenderDefaults(context);
-     const format = bitmapOutputFormat(defaults.render) ?? 'braille';
-     const layout = resolvedBitmapLayout(defaults);
-     const rows = await rasterizeImage(Uint8Array.from(message.image), Number.parseInt(defaults.size, 10));
-    const emojiRows = format === 'emoji' ? await rasterizeImageEmojiArt(Uint8Array.from(message.image), Number.parseInt(defaults.size, 10)) : undefined;
-    const output = await textToBitmap('█', Number.parseInt(defaults.size, 10), format, {
-     compact: defaults.compact === 'on', maxExtent: undefined, ...layout,
-     emojiArtRasterizer: emojiRows ? () => emojiRows : undefined,
-    }, () => rows);
-    const edit = new vscode.WorkspaceEdit();
-    targetSelections.forEach(selection => edit.replace(
-     editor.document.uri,
-     new vscode.Range(selection.start, selection.end),
-     startBitmapOnNewLine(output, editor.document.lineAt(selection.start.line).text.slice(0, selection.start.character)),
-    ));
-    const inserted = await vscode.workspace.applyEdit(edit);
-     if (!inserted) { await vscode.window.showWarningMessage('Could not insert the Pretty Print image into the original editor selection.'); return; }
+     const isZalgo = isZalgoMode || defaults.render === 'zalgo';
+     const size = Number.parseInt(defaults.size, 10);
+     const rows = await rasterizeImage(Uint8Array.from(message.image), size);
+     let output: string;
+     if (isZalgo) {
+      output = optimizeCombiningArt(rows, defaults.compact === 'on', defaults['zalgo-strategy'] ?? 'detailed');
+     } else {
+      const format = bitmapOutputFormat(defaults.render) ?? 'braille';
+      const layout = resolvedBitmapLayout(defaults);
+      const emojiRows = format === 'emoji' ? await rasterizeImageEmojiArt(Uint8Array.from(message.image), size) : undefined;
+      output = await textToBitmap('█', size, format, {
+       compact: defaults.compact === 'on', maxExtent: undefined, ...layout,
+       emojiArtRasterizer: emojiRows ? () => emojiRows : undefined,
+      }, () => rows);
+     }
+     const edit = new vscode.WorkspaceEdit();
+     targetSelections.forEach(selection => edit.replace(
+      editor.document.uri,
+      new vscode.Range(selection.start, selection.end),
+      startBitmapOnNewLine(output, editor.document.lineAt(selection.start.line).text.slice(0, selection.start.character)),
+     ));
      panel.dispose();
+     const inserted = await vscode.workspace.applyEdit(edit);
+     if (!inserted) { await vscode.window.showWarningMessage('Could not insert the Pretty Print image into the original editor selection.'); return; }
     } catch (error) {
      await vscode.window.showErrorMessage(`Could not pretty print image. ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -1589,28 +1671,27 @@ export async function activate(context: vscode.ExtensionContext) {
      && inlineMenuAnchor.expressionStart === query.expressionStart ? inlineMenuAnchor.kind : undefined;
     if (inlineMenu === 'compatibility') {
      const targets = configuredCompatibilityTargets();
-     const currentStyle = vscode.workspace.getConfiguration('youhavecode').get<CompatibilityBadgeStyle>('compatibilityBadgeStyle', 'symbol');
+     const currentStyle = normalizeBadgeStyle(vscode.workspace.getConfiguration('youhavecode').get<string>('compatibilityBadgeStyle', 'icon'));
      const presetItem = new vscode.CompletionItem('Presets…', vscode.CompletionItemKind.Folder);
      presetItem.detail = 'Enforce All, Warn All, Dismiss All, Current Platform, Desktop OS, or Typical Consumer Stack';
      presetItem.insertText = ''; presetItem.range = completionRange; presetItem.sortText = '!000';
      presetItem.command = { command: 'youhavecode.setCompatibilityPreset', title: 'Compatibility Presets' };
      const items = compatibilityTargets.map(({ key, label }, index) => {
       const target = targets[key];
-      const symbol = getTargetSymbol(key);
       const policy = normalizePolicy(target.policy);
       const policyLabel = policy === 'enforced' ? 'Enforced' : policy === 'dismissed' ? 'Dismissed' : 'Warned';
       const count = unsupportedGlyphCount(entries, key, compatibilityProfiles, target.version);
       const lossText = `-${count} glyph${count === 1 ? '' : 's'}`;
-      const itemLabel = currentStyle === 'icon' ? `$(${getTargetCodicon(key)}) ${label}…` : `${label} (${symbol})…`;
+      const itemLabel = currentStyle === 'icon' ? `${iconGlyph(key)} ${label}…` : currentStyle === 'letter' ? `${targetLetterBadges[key]} · ${label}…` : `${label}…`;
       const item = new vscode.CompletionItem({ label: itemLabel, description: `${policyLabel} · ${lossText}` }, vscode.CompletionItemKind.Folder);
       item.detail = 'Configure the platform support policy';
       item.insertText = ''; item.range = completionRange; item.sortText = `!0${index + 1}`;
       item.command = { command: 'youhavecode.compatibilityTarget', title: `Configure ${label}`, arguments: [key] };
       return item;
      });
-     const styleItems = (['symbol', 'letter', 'icon'] as const).map((style, index) => {
-      const item = new vscode.CompletionItem({ label: `Badge Style: ${style === 'symbol' ? 'Symbol (🍎/)' : style === 'letter' ? 'Letter (Mac)' : 'Product Icons'}`, description: style === currentStyle ? 'current' : '' }, vscode.CompletionItemKind.EnumMember);
-      item.detail = style === 'symbol' ? 'Use emoji symbols for compatibility badges' : style === 'letter' ? 'Use letter abbreviations for compatibility badges' : 'Use VS Code Product Icons for compatibility badges';
+     const styleItems = (['icon', 'letter', 'name'] as const).map((style, index) => {
+      const item = new vscode.CompletionItem({ label: `Badge Style: ${style === 'icon' ? 'Product Icons' : style === 'letter' ? 'Abbreviated Name (Mac)' : 'Name (macOS)'}`, description: style === currentStyle ? 'current' : '' }, vscode.CompletionItemKind.EnumMember);
+      item.detail = style === 'icon' ? 'Use VS Code Product Icons for compatibility badges' : style === 'letter' ? 'Use abbreviated platform names for compatibility badges' : 'Use full platform names for compatibility badges';
       item.insertText = ''; item.range = completionRange; item.sortText = `!1${index}`;
       item.command = { command: 'youhavecode.setCompatibilityBadgeStyle', title: `Use ${style} badges`, arguments: [style] };
       return item;
@@ -1813,9 +1894,10 @@ export async function activate(context: vscode.ExtensionContext) {
      return emojiPresentationChoices(entry, emojiPresentation(), query.representation === undefined || query.representation === 'glyph').map((choice, variantIndex) => {
       const compatibilityIndicator = configuredCompatibilityIndicatorMode() === 'all' ? compatibilityNotice.status : compatibilityNotice.badge;
       const item = new vscode.CompletionItem({ label: `${displayGlyph(entry, choice.presentation)}${choice.label ? ` ${choice.label} · U+` : '  U+'}${entry.hex}`, description: compatibilityIndicator ? `${compatibilityIndicator} ${entry.name}` : entry.name }, vscode.CompletionItemKind.Text);
-      const compat = compatibilityNotice.iconCompat;
+      const compat = compatibilityNotice.supported;
+      const compatToken = compatibilityNotice.compatToken;
       item.detail = inlineMenu === 'recent' ? 'Recently used' : `${usageStats.glyphs[entry.hex]?.count ?? 0} uses`;
-      item.documentation = glyphPropertySummary(entry, aliases, compat);
+      item.documentation = glyphPropertySummary(entry, aliases, compat, compatToken);
       item.filterText = `${entry.name} ${entry.hex} ${entry.character}${choice.label ? ` ${choice.label}` : ''}`;
       item.insertText = renderCompletionOutput(entry.character, entries, query, output, insertionFormat, choice.presentation, document.languageId) + (repeat ? ':::' : '');
       item.range = completionRange;
@@ -1956,7 +2038,7 @@ export async function activate(context: vscode.ExtensionContext) {
    const targetLabel = compatibilityTargets.find(candidate => candidate.key === compatibilityDraftTarget)?.label ?? compatibilityDraftTarget;
    const currentPolicy = normalizePolicy(configuredCompatibilityTargets()[compatibilityDraftTarget]?.policy);
    const policyLabel = currentPolicy === 'enforced' ? 'Enforced' : currentPolicy === 'dismissed' ? 'Dismissed' : 'Warned';
-   const item = new vscode.CompletionItem({ label: `$(${getTargetCodicon(compatibilityDraftTarget)}) Change ${targetLabel} Compatibility…`, description: policyLabel }, vscode.CompletionItemKind.Event);
+   const item = new vscode.CompletionItem({ label: `${iconGlyph(compatibilityDraftTarget)} Change ${targetLabel} Compatibility…`, description: policyLabel }, vscode.CompletionItemKind.Event);
    item.detail = `Configure the ${targetLabel} platform support policy without inserting a glyph`;
    item.filterText = draft;
    item.insertText = '';
@@ -2062,8 +2144,9 @@ export async function activate(context: vscode.ExtensionContext) {
      emojiPresentationChoices(entry, emojiPresentation(), query.representation === undefined || query.representation === 'glyph').forEach((choice, variantIndex) => {
       const compatibilityIndicator = configuredCompatibilityIndicatorMode() === 'all' ? compatibilityNotice.status : compatibilityNotice.badge;
       const item = new vscode.CompletionItem({ label: `${displayGlyph(entry, choice.presentation)}${choice.label ? ` ${choice.label} · U+` : '  U+'}${entry.hex}`, description: compatibilityIndicator ? `${compatibilityIndicator} ${entry.name}` : entry.name }, vscode.CompletionItemKind.Text);
-      const compat = compatibilityNotice.iconCompat;
-      item.documentation = glyphPropertySummary(entry, aliases, compat);
+      const compat = compatibilityNotice.supported;
+      const compatToken = compatibilityNotice.compatToken;
+      item.documentation = glyphPropertySummary(entry, aliases, compat, compatToken);
       item.filterText = `${entry.name} ${entry.hex} ${entry.character} ${(customGlyphTags[entry.hex] ?? []).join(' ')}${choice.label ? ` ${choice.label}` : ''}`;
       const repeat = query.prefix === ':::';
       const output = effectiveQueryOption(query, 'render', renderDefaults);
@@ -2124,22 +2207,21 @@ export async function activate(context: vscode.ExtensionContext) {
       }
      });
     }
+    const iconMatches = query.mode === 'token' && query.draft && !query.filters.length ? matchingProductIcons(productIcons, query.draft) : [];
+    if (iconMatches.length) {
+     iconMatches.forEach((icon, index) => {
+      const item = new vscode.CompletionItem({ label: `$(${icon.name}) ${icon.name}`, description: 'Product Icon' });
+      item.detail = icon.description ? `${icon.description}${icon.tags?.length ? ` · ${icon.tags.join(', ')}` : ''}` : 'VS Code Product Icon';
+      item.filterText = `${query.draft} ${icon.name} ${(icon.tags ?? []).join(' ')}`;
+      item.insertText = `$(${icon.name})`;
+      item.range = completionRange;
+      item.sortText = `!8${String(index).padStart(3, '0')}`;
+      items.push(item);
+     });
+    }
     if (!items.length) {
-     const iconMatches = query.mode === 'token' ? matchingProductIcons(productIcons, query.draft) : [];
-     if (iconMatches.length) {
-      iconMatches.forEach((icon, index) => {
-       const item = new vscode.CompletionItem({ label: `$(${icon.name}) ${icon.name}`, description: 'Product Icon' }, vscode.CompletionItemKind.Color);
-       item.detail = icon.description ? `${icon.description}${icon.tags?.length ? ` · ${icon.tags.join(', ')}` : ''}` : 'VS Code Product Icon';
-       item.filterText = query.draft;
-       item.insertText = `$(${icon.name})`;
-       item.range = completionRange;
-       item.sortText = `!7${String(index).padStart(3, '0')}`;
-       items.push(item);
-      });
-     } else {
-      const activeDefaults = [...enabledDefaultTerms(), defaultFilterSummary()].filter(Boolean).join(' ');
-      items.push(noMatchesItem(query.draft, completionRange, activeDefaults));
-     }
+     const activeDefaults = [...enabledDefaultTerms(), defaultFilterSummary()].filter(Boolean).join(' ');
+     items.push(noMatchesItem(query.draft, completionRange, activeDefaults));
     }
    return new vscode.CompletionList(items, true);
   },
@@ -2231,7 +2313,7 @@ export async function activate(context: vscode.ExtensionContext) {
   const activeFamilies = fontPreferenceState().active;
   const sizes = [8, 16, 24, 32, 48, 64, 96, 128];
   const transforms: readonly BitmapD4[] = ['identity', 'rotate-90', 'rotate-180', 'rotate-270', 'mirror-left-right', 'flip-top-bottom', 'reflect-slash', 'reflect-backslash'];
-  const types: readonly BitmapTextFormat[] = ['braille', 'blockElements', 'iphoneBlocks', 'emoji', 'binary', 'hex'];
+  const types: readonly BitmapTextFormat[] = ['braille', 'blockElements', 'iphoneBlocks', 'emoji', 'binary', 'hex', 'zalgo'];
   const sweepFamilies = kind === 'fonts' ? activeFamilies : activeFamilies.slice(0, 1);
   const lines: string[] = [];
   const segments = [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(target)].map(segment => segment.segment);
@@ -2373,7 +2455,7 @@ export async function activate(context: vscode.ExtensionContext) {
          editor.document.lineAt(target.range.start.line).text.slice(0, target.range.start.character),
         )));
       } else {
-      const directBitmap = (['braille', 'blockElements', 'iphoneBlocks', 'emoji', 'binary', 'hex'] as const).includes(selectedFormat.format as BitmapTextFormat)
+      const directBitmap = (['braille', 'blockElements', 'iphoneBlocks', 'emoji', 'binary', 'hex', 'zalgo'] as const).includes(selectedFormat.format as BitmapTextFormat)
        ? bitmapOutputValue(selectedFormat.format as BitmapTextFormat)
        : undefined;
       const selectedOutput = selectedFormat.format === 'lastBitmap' ? lastSelectionOutput : directBitmap ?? outputValueFromFormat(selectedFormat.format as DeconstructionFormat);
@@ -2443,7 +2525,7 @@ export async function activate(context: vscode.ExtensionContext) {
   if (!event.affectsConfiguration('youhavecode')) { return; }
   renderDefaults = configuredRenderDefaults(context);
   insertionFormat = outputFormat(renderDefaults.render, insertionFormat);
- if (event.affectsConfiguration('youhavecode.bitmapCompact') || event.affectsConfiguration('youhavecode.bitmapSize') || event.affectsConfiguration('youhavecode.bitmapWrapLimit') || event.affectsConfiguration('youhavecode.bitmapGlyphMapping') || event.affectsConfiguration('youhavecode.bitmapFlowDirection') || event.affectsConfiguration('youhavecode.bitmapWrapDirection') || event.affectsConfiguration('youhavecode.bitmapD4')) { sidebar.refreshPrettyPrintHeaders(); return; }
+ if (event.affectsConfiguration('youhavecode.prettyPrintOutput') || event.affectsConfiguration('youhavecode.zalgoStrategy') || event.affectsConfiguration('youhavecode.bitmapCompact') || event.affectsConfiguration('youhavecode.bitmapSize') || event.affectsConfiguration('youhavecode.bitmapWrapLimit') || event.affectsConfiguration('youhavecode.bitmapGlyphMapping') || event.affectsConfiguration('youhavecode.bitmapFlowDirection') || event.affectsConfiguration('youhavecode.bitmapWrapDirection') || event.affectsConfiguration('youhavecode.bitmapD4')) { sidebar.refreshPrettyPrintHeaders(); return; }
   sidebar.refresh();
  }));
 }
@@ -2526,7 +2608,7 @@ function formatLabel(format: DeconstructionFormat): string {
 function optionOutputLabel(output: string): string {
  return {
   glyph: 'Glyph / symbol', components: 'Glyph components', unicode: 'JSON escapes', codepoint: 'Code points', name: 'Unicode names', details: 'Details', full: 'Full details',
-  braille: 'Braille dots', 'block-elements': 'Block Elements', 'iphone-blocks': 'iPhone solid blocks', emoji: 'Emoji Art', binary: 'Binary', hex: 'Hex',
+  braille: 'Braille dots', 'block-elements': 'Block Elements', 'iphone-blocks': 'iPhone solid blocks', emoji: 'Emoji Art', binary: 'Binary', hex: 'Hex', zalgo: 'Zalgo / Combining Art',
  }[output] ?? output;
 }
 
@@ -2542,7 +2624,7 @@ function optionValueDetail(key: OptionKey, value: string): string {
   name: 'Insert the Unicode name', details: 'Insert glyph, code point, and name', full: 'Insert all Unicode details',
   braille: 'Render pixels as Braille dots', 'block-elements': 'Pack 2 × 2 pixels into Block Elements',
   'iphone-blocks': 'Render pixels as solid and hollow square cells', emoji: 'Render pixels as Emoji Art cells',
-  binary: 'Render pixels as 0 and 1', hex: 'Render pixels as hexadecimal',
+  binary: 'Render pixels as 0 and 1', hex: 'Render pixels as hexadecimal', zalgo: 'Render multi-line combining diacritics art',
  }[value] ?? 'Output format';
 }
 
@@ -2563,11 +2645,11 @@ function outputValueFromFormat(format: DeconstructionFormat): string {
 }
 
 function bitmapOutputFormat(output: string | undefined): BitmapTextFormat | undefined {
- return { braille: 'braille', 'block-elements': 'blockElements', 'iphone-blocks': 'iphoneBlocks', emoji: 'emoji', binary: 'binary', hex: 'hex' }[output ?? ''] as BitmapTextFormat | undefined;
+ return { braille: 'braille', 'block-elements': 'blockElements', 'iphone-blocks': 'iphoneBlocks', emoji: 'emoji', binary: 'binary', hex: 'hex', zalgo: 'zalgo' }[output ?? ''] as BitmapTextFormat | undefined;
 }
 
 function bitmapOutputValue(format: BitmapTextFormat): string {
- return { braille: 'braille', blockElements: 'block-elements', iphoneBlocks: 'iphone-blocks', emoji: 'emoji', binary: 'binary', hex: 'hex' }[format];
+ return { braille: 'braille', blockElements: 'block-elements', iphoneBlocks: 'iphone-blocks', emoji: 'emoji', binary: 'binary', hex: 'hex', zalgo: 'zalgo' }[format];
 }
 
 function queryOutputLabel(query: UnicodeQuery, fallback: DeconstructionFormat, defaults: RenderDefaults): string {
@@ -2591,45 +2673,53 @@ function isBitmapQueryOutput(query: UnicodeQuery, output: string | undefined): b
  return (!query.representation || query.representation === 'prettyPrint') && !!bitmapOutputFormat(output);
 }
 
-function glyphCompatibilityNotice(entry: UnicodeEntry, targets: CompatibilityTargetSettings, unknownPolicy: CompatibilityFallbackPolicy, profiles: CompatibilityProfiles): { badge?: string; detail?: string; status: string; supported: string; iconCompat: string; excluded?: boolean } {
- const style = vscode.workspace.getConfiguration('youhavecode').get<CompatibilityBadgeStyle>('compatibilityBadgeStyle', 'symbol');
+function glyphCompatibilityNotice(entry: UnicodeEntry, targets: CompatibilityTargetSettings, unknownPolicy: CompatibilityFallbackPolicy, profiles: CompatibilityProfiles): { badge?: string; detail?: string; status: string; supported: string; compatToken: string; excluded?: boolean } {
+ const style = normalizeBadgeStyle(vscode.workspace.getConfiguration('youhavecode').get<string>('compatibilityBadgeStyle', 'icon'));
  const scalarCodepoints = Array.from(entry.character, character => character.codePointAt(0)!).filter(codepoint => codepoint !== 0xFE0E && codepoint !== 0xFE0F);
  const findings = fontCoverageFindings(scalarCodepoints, targets, profiles).concat(emojiCompatibilityFindings(entry.emojiVersion, targets, profiles));
  if (findings.some(finding => normalizePolicy(finding.policy) === 'enforced')) {
-  return { excluded: true, status: '', supported: '', iconCompat: '' };
+  return { excluded: true, status: '', supported: '', compatToken: '' };
  }
  const badge = compatibilityWarningBadge(findings, profiles, style);
  const detail = compatibilityWarningText(findings);
  if (badge || detail) {
-  return { badge, detail, status: compatibilityStatusBadges(findings, targets, profiles, style), supported: compatibilitySupportedNames(findings, targets), iconCompat: compatibilityWarningBadge(findings, profiles, 'icon') ?? compatibilityStatusBadges(findings, targets, profiles, 'icon') };
+  return { badge, detail, status: compatibilityStatusBadges(findings, targets, profiles, style), supported: compatibilitySupportedList(findings, targets, style), compatToken: compatibilitySupportedTokens(findings, targets) };
  }
  if (hasCompleteFontCoverageEvidence(targets, profiles) || hasEmojiCompatibilityEvidence(entry.emojiVersion, profiles)) {
-  return { status: compatibilityStatusBadges(findings, targets, profiles, style), supported: compatibilitySupportedNames(findings, targets), iconCompat: compatibilityStatusBadges(findings, targets, profiles, 'icon') };
+  return { status: compatibilityStatusBadges(findings, targets, profiles, style), supported: compatibilitySupportedList(findings, targets, style), compatToken: compatibilitySupportedTokens(findings, targets) };
  }
  const unknownFindings = unknownCompatibilityFindings(targets, profiles, unknownPolicy);
  if (unknownFindings.some(finding => normalizePolicy(finding.policy) === 'enforced')) {
-  return { excluded: true, status: '', supported: '', iconCompat: '' };
+  return { excluded: true, status: '', supported: '', compatToken: '' };
  }
  return {
   badge: compatibilityWarningBadge(unknownFindings, profiles, style) ?? unknownCompatibilityWarningBadge(unknownPolicy, style),
   detail: compatibilityWarningText(unknownFindings) ?? unknownCompatibilityWarningText(unknownPolicy),
   status: compatibilityStatusBadges(unknownFindings, targets, profiles, style),
-  supported: compatibilitySupportedNames(unknownFindings, targets),
-  iconCompat: compatibilityWarningBadge(unknownFindings, profiles, 'icon') ?? unknownCompatibilityWarningBadge(unknownPolicy, 'icon') ?? compatibilityStatusBadges(unknownFindings, targets, profiles, 'icon'),
+  supported: compatibilitySupportedList(unknownFindings, targets, style),
+  compatToken: compatibilitySupportedTokens(unknownFindings, targets),
  };
 }
 
-// Filter-syntax summary "(key=value - Friendly name)" so each segment doubles as a copyable query token.
-// CompletionItem.detail is rendered as a single line (\n is ignored), so this returns a Markdown bullet
-// list for item.documentation instead, which the suggest widget's docs panel renders as real separate lines.
-function glyphPropertySummary(entry: UnicodeEntry, aliases: UnicodePropertyAliases, compat?: string): vscode.MarkdownString {
+function slugifyBlock(block: string): string {
+ return block.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+// Markdown documentation tooltip showing glyph, codepoint, name, and friendly-first property tokens.
+function glyphPropertySummary(entry: UnicodeEntry, aliases: UnicodePropertyAliases, compat?: string, compatToken?: string): vscode.MarkdownString {
  const segments: [FilterKey, string][] = [['category', entry.category], ['bidi', entry.bidi], ['combining', String(entry.combining)]];
- const parts = [`(block=${entry.block})`, ...segments.map(([key, value]) => {
-  const friendly = propertyValueDescription(aliases, key, value);
-  return `(${key}=${value}${friendly ? ` - ${friendly}` : ''})`;
- })];
- if (compat) { parts.push(`(compat=${compat})`); }
- return new vscode.MarkdownString(parts.map(part => `- ${part}`).join('\n'), true);
+ const parts = [
+  `${entry.block} (block=${slugifyBlock(entry.block)})`,
+  ...segments.map(([key, value]) => {
+   const friendly = propertyValueDescription(aliases, key, value) ?? value;
+   return `${friendly} (${key}=${value})`;
+  }),
+ ];
+ if (compat) {
+  parts.push(`${compat}${compatToken ? ` (compat=${compatToken})` : ''}`);
+ }
+ const header = `### ${entry.character} U+${entry.hex} ${entry.name}\n\n`;
+ return new vscode.MarkdownString(header + parts.map(part => `- ${part}`).join('\n'), true);
 }
 
 // Min/max codepoint per Unicode block name, derived from the loaded entries rather than a separate ranges dataset.
@@ -2700,8 +2790,9 @@ function configuredRenderDefaults(context: vscode.ExtensionContext): RenderDefau
  const explicitSize = sizeInspection?.workspaceFolderValue ?? sizeInspection?.workspaceValue ?? sizeInspection?.globalValue;
  const size = explicitSize ?? context.globalState.get('brailleRasterSize', configuration.get('bitmapSize', 32));
  const wrapLimit = configuration.get<number>('bitmapWrapLimit', 0);
+ const prettyPrintOutput = configuration.get<string>('prettyPrintOutput', 'braille');
  return {
-  render: configuration.get('defaultOutput', 'glyph'),
+  render: prettyPrintOutput || configuration.get('defaultOutput', 'glyph'),
   size: `${size}x${size}`,
   wrap: wrapLimit === -2 ? 'glyph' : wrapLimit < 0 ? 'none' : wrapLimit > 0 ? String(wrapLimit) : 'auto',
   compact: configuration.get('bitmapCompact', true) ? 'on' : 'off',
@@ -2709,5 +2800,6 @@ function configuredRenderDefaults(context: vscode.ExtensionContext): RenderDefau
   flow: configuration.get('bitmapFlowDirection', 'auto'),
   'wrap-direction': configuration.get('bitmapWrapDirection', 'auto'),
   d4: configuration.get('bitmapD4', 'identity'),
+  'zalgo-strategy': configuration.get<ZalgoStrategy>('zalgoStrategy', 'detailed'),
  };
 }

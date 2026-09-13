@@ -11,12 +11,19 @@ export function parseProductIcons(json: string | Uint8Array): ProductIcon[] {
  return JSON.parse(text) as ProductIcon[];
 }
 
-// Only matches whole name/tag/description words to avoid unrelated substring hits (e.g. "sag" inside "message").
+// Matches by icon name exact/prefix/word-prefix, and whole-word tags/descriptions.
 export function matchingProductIcons(icons: readonly ProductIcon[], draft: string, limit = 5): ProductIcon[] {
  const query = draft.trim().toLowerCase();
- if (query.length < 3) { return []; }
- const nameMatches = icons.filter(icon => icon.name === query || words(icon.name).includes(query));
- const tagMatches = icons.filter(icon => !nameMatches.includes(icon)
-  && ((icon.tags?.some(tag => words(tag).includes(query))) || (icon.description && words(icon.description).includes(query))));
+ if (query.length < 2) { return []; }
+ const nameMatches = icons.filter(icon =>
+  icon.name === query ||
+  icon.name.startsWith(query) ||
+  icon.name.split('-').some(segment => segment.startsWith(query))
+ );
+ const tagMatches = icons.filter(icon =>
+  !nameMatches.includes(icon) &&
+  ((icon.tags?.some(tag => words(tag).includes(query) || tag.toLowerCase() === query)) ||
+   (icon.description && words(icon.description).includes(query)))
+ );
  return [...nameMatches, ...tagMatches].slice(0, limit);
 }

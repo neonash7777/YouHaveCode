@@ -1,13 +1,13 @@
 import type { UnicodeEntry } from './unicodeData';
 
-export const filterKeys = ['bidi', 'category', 'combining', 'decomp', 'lang', 'block', 'emoji'] as const;
+export const filterKeys = ['bidi', 'category', 'combining', 'decomp', 'lang', 'block', 'emoji', 'compat'] as const;
 export type FilterKey = typeof filterKeys[number];
-const filterAliases: Readonly<Record<string, FilterKey>> = { bidirectional: 'bidi', decomposition: 'decomp', language: 'lang', script: 'lang' };
+const filterAliases: Readonly<Record<string, FilterKey>> = { bidirectional: 'bidi', decomposition: 'decomp', language: 'lang', script: 'lang', compatibility: 'compat', platform: 'compat', platforms: 'compat' };
 export const filterInputKeys = [...filterKeys, ...Object.keys(filterAliases)];
 export const optionKeys = ['render', 'output', 'size', 'wrap', 'compact', 'flow', 'wrap-direction', 'd4'] as const;
 export const suggestedOptionKeys = ['output', 'size', 'wrap', 'compact', 'flow', 'wrap-direction', 'd4'] as const;
 export const actionKeys = ['print'] as const;
-export const outputValues = ['glyph', 'components', 'unicode', 'codepoint', 'name', 'details', 'full', 'braille', 'block-elements', 'iphone-blocks', 'emoji', 'binary', 'hex'] as const;
+export const outputValues = ['glyph', 'components', 'unicode', 'codepoint', 'name', 'details', 'full', 'braille', 'block-elements', 'iphone-blocks', 'emoji', 'binary', 'hex', 'zalgo'] as const;
 export type OptionKey = typeof optionKeys[number];
 const d4ValueAliases: Readonly<Record<string, string>> = { mirror: 'mirror-left-right', flip: 'flip-top-bottom', diagonal: 'reflect-slash', antidiagonal: 'reflect-backslash' };
 
@@ -50,7 +50,7 @@ export function withDefaultFilters(query: UnicodeQuery, configured: DefaultFilte
 }
 
 export interface NameWord { value: string; count: number }
-export type GlyphPropertyKey = 'name' | 'bidi' | 'combining' | 'category' | 'decomp' | 'unicode' | 'lang' | 'block' | 'emoji';
+export type GlyphPropertyKey = 'name' | 'bidi' | 'combining' | 'category' | 'decomp' | 'unicode' | 'lang' | 'block' | 'emoji' | 'compat';
 export interface GlyphPropertyExpansion { key: GlyphPropertyKey; label: string; value: string; detail: string }
 
 const characterAliases: Readonly<Record<string, readonly string[]>> = {
@@ -59,7 +59,7 @@ const characterAliases: Readonly<Record<string, readonly string[]>> = {
 const glyphPropertyAliases: Readonly<Record<string, GlyphPropertyKey>> = {
  n: 'name', name: 'name', b: 'bidi', bidi: 'bidi', bidirectional: 'bidi', c: 'combining', combining: 'combining',
  cat: 'category', category: 'category', d: 'decomp', decomp: 'decomp', decomposition: 'decomp', u: 'unicode', unicode: 'unicode', codepoint: 'unicode',
- l: 'lang', lang: 'lang', language: 'lang', block: 'block', e: 'emoji', emoji: 'emoji',
+ l: 'lang', lang: 'lang', language: 'lang', block: 'block', e: 'emoji', emoji: 'emoji', compat: 'compat', compatibility: 'compat', platform: 'compat', platforms: 'compat',
 };
 
 export function optionValues(key: OptionKey, draft: string): string[] {
@@ -255,7 +255,7 @@ export function glyphPropertyInputLabels(draft: string): string[] {
  const exact = glyphPropertyAliases[normalized];
  if (exact) { return [`?${normalized}`]; }
  const preferredAliases: Readonly<Record<GlyphPropertyKey, string>> = {
-  name: 'name', bidi: 'bidi', combining: 'combining', category: 'category', decomp: 'decomp', unicode: 'unicode', lang: 'language', block: 'block', emoji: 'emoji',
+  name: 'name', bidi: 'bidi', combining: 'combining', category: 'category', decomp: 'decomp', unicode: 'unicode', lang: 'language', block: 'block', emoji: 'emoji', compat: 'compat',
  };
  return [...new Set(Object.entries(glyphPropertyAliases).filter(([alias]) => alias.startsWith(normalized)).map(([, key]) => `?${preferredAliases[key]}`))];
 }
@@ -454,6 +454,7 @@ export function propertyValue(entry: UnicodeEntry, key: FilterKey): string {
   case 'lang': return entry.language;
   case 'block': return entry.block;
   case 'emoji': return entry.emoji ? 'COLOR' : /^\p{Emoji}$/u.test(entry.character) ? 'TEXT' : 'NONE';
+  case 'compat': return entry.emojiVersion ? `E${entry.emojiVersion.replace(/^E/i, '')}` : 'ALL';
  }
 }
 
@@ -464,7 +465,7 @@ function decompositionType(value?: string): string {
 }
 
 export function glyphPropertyLabel(key: GlyphPropertyKey): string {
- return { name: 'Name', bidi: 'Bidirectional class', combining: 'Combining class', category: 'Category', decomp: 'Decomposition', unicode: 'Unicode', lang: 'Language', block: 'Block', emoji: 'Emoji presentation' }[key];
+ return { name: 'Name', bidi: 'Bidirectional class', combining: 'Combining class', category: 'Category', decomp: 'Decomposition', unicode: 'Unicode', lang: 'Language', block: 'Block', emoji: 'Emoji presentation', compat: 'Compatibility' }[key];
 }
 
 function nameTokens(name: string): string[] { return name.toUpperCase().match(/[A-Z0-9]+/g) ?? []; }

@@ -9,7 +9,7 @@ import { emptyUsageStats, orderFilterValues, rankCustomTags, rankGlyphHexes, rec
 import { bitmapSizeChoices, selectionOutputChoices } from '../extension';
 import { UnicodeSidebarProvider } from '../unicodeSidebar';
 import { resolveDelegateProfile } from '../delegateSandbox';
-import { compatibilitySummary, compatibilityWarningBadge, compatibilityWarningText, defaultCompatibilityTargets, emojiCompatibilityFindings, fallbackCompatibilityProfiles, fontCoverageFindings, getTargetCodicon, getTargetSymbol, hasEmojiCompatibilityEvidence, parseCompatibilityProfiles, resolveCompatibilityTargets, unknownCompatibilityFindings, unknownCompatibilityWarningBadge, unknownCompatibilityWarningText } from '../compatibilitySettings';
+import { compatibilitySummary, compatibilityWarningBadge, compatibilityWarningText, defaultCompatibilityTargets, emojiCompatibilityFindings, fallbackCompatibilityProfiles, fontCoverageFindings, getTargetCodicon, hasEmojiCompatibilityEvidence, parseCompatibilityProfiles, resolveCompatibilityTargets, unknownCompatibilityFindings, unknownCompatibilityWarningBadge, unknownCompatibilityWarningText } from '../compatibilitySettings';
 
 const sampleEntries = parseCompactUnicode([
  '0x,Name,Category,Bidi,Combining,Decomp,Lang,Block',
@@ -102,14 +102,14 @@ suite('Unicode data', () => {
 
 suite('Selection output menu', () => {
  test('puts instant, quick, and custom pretty print before direct textual outputs', () => {
-  const choices = selectionOutputChoices('braille', { render: 'braille', size: '32x32', wrap: '80', compact: 'on', flow: 'lr', 'wrap-direction': 'ud', d4: 'identity' });
+  const choices = selectionOutputChoices('braille', { render: 'braille', size: '32x32', wrap: '80', compact: 'on', flow: 'lr', 'wrap-direction': 'ud', d4: 'identity', 'zalgo-strategy': 'detailed' });
   assert.deepStrictEqual(choices.slice(0, 3), [
    { label: 'Pretty Print', description: 'Use last settings · Braille dots · 32x32 · wrap 80 · lr/ud · on · identity', format: 'lastBitmap' },
    { label: 'Pretty Print…', description: 'Choose only bitmap type and size', format: 'quickBitmap' },
    { label: 'Pretty Print*…', description: 'Customize type, size, wrapping, spacing, flow, and transform', format: 'customBitmap' },
   ]);
   assert.deepStrictEqual(choices.slice(3).map(choice => choice.format), [
-    'braille', 'blockElements', 'iphoneBlocks', 'emoji', 'binary', 'hex',
+    'braille', 'blockElements', 'iphoneBlocks', 'emoji', 'binary', 'hex', 'zalgo',
    'symbols', 'components', 'details', 'fullDetails', 'codepoints', 'names', 'jsonEscapes',
   ]);
  });
@@ -143,27 +143,20 @@ suite('Compatibility settings', () => {
   const findings = emojiCompatibilityFindings('E15.1', targets);
   const warning = compatibilityWarningText(findings);
   assert.strictEqual(warning, 'iOS < 17.4');
-  assert.strictEqual(compatibilityWarningBadge(findings, fallbackCompatibilityProfiles, 'symbol'), '(!📱)');
+  assert.strictEqual(compatibilityWarningBadge(findings, fallbackCompatibilityProfiles, 'icon'), '$(warning)($(device-mobile))');
   assert.strictEqual(compatibilityWarningBadge(findings, fallbackCompatibilityProfiles, 'letter'), '(!iOS)');
   assert.strictEqual(hasEmojiCompatibilityEvidence('E15.1'), true);
   assert.strictEqual(hasEmojiCompatibilityEvidence(undefined), false);
-  assert.strictEqual(unknownCompatibilityWarningBadge('warn', 'symbol'), '(!❓)');
+  assert.strictEqual(unknownCompatibilityWarningBadge('warn', 'icon'), '$(warning)($(question))');
   assert.strictEqual(unknownCompatibilityWarningBadge('warn', 'letter'), '(!?)');
   assert.strictEqual(unknownCompatibilityWarningText('warn'), 'No bundled platform evidence');
  });
 
- test('resolves target platform symbols and codicons', () => {
-  assert.strictEqual(getTargetSymbol('macos', true), '');
-  assert.strictEqual(getTargetSymbol('macos', false), '🍎');
-  assert.strictEqual(getTargetSymbol('windows'), '⊞');
-  assert.strictEqual(getTargetSymbol('ubuntu'), '🐧');
-  assert.strictEqual(getTargetSymbol('android-aosp'), '🤖');
-  assert.strictEqual(getTargetSymbol('ios'), '📱');
-
-  assert.strictEqual(getTargetCodicon('macos'), 'desktop-download');
-  assert.strictEqual(getTargetCodicon('windows'), 'desktop-download');
+ test('resolves target platform codicons', () => {
+  assert.strictEqual(getTargetCodicon('macos'), 'vm');
+  assert.strictEqual(getTargetCodicon('windows'), 'vm');
   assert.strictEqual(getTargetCodicon('ubuntu'), 'terminal-linux');
-  assert.strictEqual(getTargetCodicon('android-aosp'), 'device-mobile');
+  assert.strictEqual(getTargetCodicon('android-aosp'), 'hubot');
   assert.strictEqual(getTargetCodicon('ios'), 'device-mobile');
  });
 
@@ -171,8 +164,8 @@ suite('Compatibility settings', () => {
   const targets = resolveCompatibilityTargets({ macos: { version: 'current', policy: 'warned' } });
   const profiles = parseCompatibilityProfiles(JSON.stringify({ schemaVersion: 1, emojiPlatformSupport: {}, fontCoverage: { macos: { current: { ranges: ['0000..10FFFF'] } } } }));
   const findings = unknownCompatibilityFindings(targets, profiles, 'warn');
-  assert.strictEqual(compatibilityWarningBadge(findings, profiles, 'letter'), '(!WiLiiOSAn)');
-  assert.strictEqual(compatibilityWarningText(findings), 'Windows no evidence, Ubuntu no evidence, iOS no evidence, Android(AOSP) no evidence');
+  assert.strictEqual(compatibilityWarningBadge(findings, profiles, 'letter'), '(!iOSWiLiAn)');
+  assert.strictEqual(compatibilityWarningText(findings), 'iOS no evidence, Windows no evidence, Ubuntu no evidence, Android(AOSP) no evidence');
  });
 
  test('parses external compatibility profile documents', () => {
@@ -191,7 +184,7 @@ suite('Compatibility settings', () => {
     const targets = resolveCompatibilityTargets({ ios: { version: '17.0', policy: 'warned' } });
     const profiles = parseCompatibilityProfiles(JSON.stringify({ schemaVersion: 1, emojiPlatformSupport: {}, fontCoverage: { ios: { '17.0': { ranges: ['0000..007F'] } } } }));
     const findings = fontCoverageFindings([0x41, 0x203D], targets, profiles);
-    assert.strictEqual(compatibilityWarningBadge(findings, profiles, 'symbol'), '(!📱)');
+    assert.strictEqual(compatibilityWarningBadge(findings, profiles, 'icon'), '$(warning)($(device-mobile))');
     assert.strictEqual(compatibilityWarningBadge(findings, profiles, 'letter'), '(!iOS)');
     assert.strictEqual(compatibilityWarningText(findings), 'iOS missing font');
    });
@@ -275,7 +268,7 @@ suite('Unicode sidebar', () => {
   d4Icon: operation => new vscode.ThemeIcon(`d4-${operation}`),
   directionIcon: (direction, paired) => new vscode.ThemeIcon(`${paired ? 'wrap' : 'flow'}-${direction}`),
   platformIcon: target => new vscode.ThemeIcon(`platform-${target}`),
-   compatibility: () => ({ targets: resolveCompatibilityTargets({ ios: { version: '18', policy: 'required' } }), unknown: 'warn', localFont: 'permitted', badgeStyle: 'symbol' }),
+   compatibility: () => ({ targets: resolveCompatibilityTargets({ ios: { version: '18', policy: 'required' } }), unknown: 'warn', localFont: 'permitted', badgeStyle: 'icon' }),
   });
   const root = await provider.getChildren();
   assert.deepStrictEqual(root.map(item => item.label), ['Search and Insert', 'Recent', 'Frequent', 'Output Format', 'Tags', 'Properties', 'Unicode Table', 'Pretty Print', 'Default Filters', 'Tools']);
@@ -343,19 +336,21 @@ suite('Unicode sidebar', () => {
   assert.strictEqual(spacingChoices.find(item => item.label === 'Padded')?.description, undefined);
   const prettyPrintType = await provider.getChildren(settings[0]);
   assert.strictEqual(settings[0].description, 'Braille Art');
-  assert.ok(settings[7].iconPath instanceof vscode.ThemeIcon);
-  assert.strictEqual(settings[7].iconPath.id, 'd4-identity');
-  assert.deepStrictEqual(prettyPrintType.map(item => [item.label, item.command?.command, item.command?.arguments?.[0]]), [['Braille Art', 'youhavecode.setSidebarPrettyPrintSetting', 'output'], ['Block Elements Art', 'youhavecode.setSidebarPrettyPrintSetting', 'output'], ['Solid Square Art', 'youhavecode.setSidebarPrettyPrintSetting', 'output'], ['Emoji Art', 'youhavecode.setSidebarPrettyPrintSetting', 'output'], ['Binary Art', 'youhavecode.setSidebarPrettyPrintSetting', 'output'], ['Hex Art', 'youhavecode.setSidebarPrettyPrintSetting', 'output']]);
-  assert.deepStrictEqual(prettyPrintType.map(item => [item.contextValue, item.prettyPrintOutput]), [['youhavecode.prettyPrintOutputChoice', 'braille'], ['youhavecode.prettyPrintOutputChoice', 'block-elements'], ['youhavecode.prettyPrintOutputChoice', 'iphone-blocks'], ['youhavecode.prettyPrintOutputChoice', 'emoji'], ['youhavecode.prettyPrintOutputChoice', 'binary'], ['youhavecode.prettyPrintOutputChoice', 'hex']]);
+  assert.ok(settings[8].iconPath instanceof vscode.ThemeIcon);
+  assert.strictEqual(settings[8].iconPath.id, 'd4-identity');
+  assert.deepStrictEqual(prettyPrintType.map(item => [item.label, item.command?.command, item.command?.arguments?.[0]]), [['Braille Art', 'youhavecode.setSidebarPrettyPrintSetting', 'output'], ['Block Elements Art', 'youhavecode.setSidebarPrettyPrintSetting', 'output'], ['Solid Square Art', 'youhavecode.setSidebarPrettyPrintSetting', 'output'], ['Emoji Art', 'youhavecode.setSidebarPrettyPrintSetting', 'output'], ['Binary Art', 'youhavecode.setSidebarPrettyPrintSetting', 'output'], ['Hex Art', 'youhavecode.setSidebarPrettyPrintSetting', 'output'], ['Zalgo / Combining Art', 'youhavecode.setSidebarPrettyPrintSetting', 'output']]);
+  assert.deepStrictEqual(prettyPrintType.map(item => [item.contextValue, item.prettyPrintOutput]), [['youhavecode.prettyPrintOutputChoice', 'braille'], ['youhavecode.prettyPrintOutputChoice', 'block-elements'], ['youhavecode.prettyPrintOutputChoice', 'iphone-blocks'], ['youhavecode.prettyPrintOutputChoice', 'emoji'], ['youhavecode.prettyPrintOutputChoice', 'binary'], ['youhavecode.prettyPrintOutputChoice', 'hex'], ['youhavecode.prettyPrintOutputChoice.zalgo', 'zalgo']]);
   const sizes = await provider.getChildren(settings[1]);
   const lineLength = await provider.getChildren(settings[2]);
   const mapping = await provider.getChildren(settings[4]);
-  const writingDirection = await provider.getChildren(settings[5]);
-  const wrapDirection = await provider.getChildren(settings[6]);
-  const transforms = await provider.getChildren(settings[7]);
+  const zalgoStrategy = await provider.getChildren(settings[5]);
+  const writingDirection = await provider.getChildren(settings[6]);
+  const wrapDirection = await provider.getChildren(settings[7]);
+  const transforms = await provider.getChildren(settings[8]);
   assert.ok(sizes.some(item => item.label === 'Custom size…' && item.command?.command === 'youhavecode.setSidebarPrettyPrintCustomSize'));
   assert.deepStrictEqual(lineLength.map(item => item.label).slice(0, 3), ['No Wrap', 'Match Glyph Size', 'Auto (editor column)']);
   assert.deepStrictEqual(mapping.map(item => item.label), ['Square', 'Baseline', 'Baseline Tight']);
+  assert.deepStrictEqual(zalgoStrategy.map(item => item.label), ['Sculpt (3-Base Glyphs)', 'Detailed (Micro-ligatures)', 'Calculated (Bridges & Nodes)', 'Hatching (Grayscale Mesh)', 'Fast (4-bit scanlines)']);
   assert.deepStrictEqual([lineLength.at(-1)?.label, lineLength.at(-1)?.command?.command, lineLength.at(-1)?.contextValue], ['Toggle Wrapping', 'youhavecode.toggleEditorLineWrapping', 'youhavecode.editorLineWrapping']);
   assert.deepStrictEqual(writingDirection.map(item => item.label), ['Auto (transform)', 'Left to right', 'Right to left', 'Top to bottom', 'Bottom to top']);
   assert.deepStrictEqual(wrapDirection.map(item => item.label), ['Auto']);
@@ -663,7 +658,7 @@ test('exposes bounded Pretty Print debug sweeps only in developer mode', async (
 test('uses persisted bitmap output names for Pretty Print labels', async () => {
  const provider = new UnicodeSidebarProvider({
   entries: async () => sampleEntries, recentHexes: () => [], usage: () => emptyUsageStats(),
-  prettyPrintDefaults: () => ({ output: 'iphone-blocks', size: '32x32', wrap: 'auto', compact: 'on', mapping: 'square', flow: 'auto', 'wrap-direction': 'auto', d4: 'identity' }),
+  prettyPrintDefaults: () => ({ output: 'iphone-blocks', size: '32x32', wrap: 'auto', compact: 'on', mapping: 'square', flow: 'auto', 'wrap-direction': 'auto', d4: 'identity', 'zalgo-strategy': 'detailed' }),
  });
  const root = await provider.getChildren();
  const prettyPrint = await provider.getChildren(root.find(item => item.group === 'prettyPrint'));
@@ -675,7 +670,7 @@ test('uses persisted bitmap output names for Pretty Print labels', async () => {
 test('marks a non-preset Pretty Print size as the selected custom size', async () => {
  const provider = new UnicodeSidebarProvider({
   entries: async () => sampleEntries, recentHexes: () => [], usage: () => emptyUsageStats(),
-  prettyPrintDefaults: () => ({ output: 'braille', size: '49x49', wrap: 'auto', compact: 'on', mapping: 'square', flow: 'auto', 'wrap-direction': 'auto', d4: 'identity' }),
+  prettyPrintDefaults: () => ({ output: 'braille', size: '49x49', wrap: 'auto', compact: 'on', mapping: 'square', flow: 'auto', 'wrap-direction': 'auto', d4: 'identity', 'zalgo-strategy': 'detailed' }),
  });
  const root = await provider.getChildren();
  const prettyPrint = await provider.getChildren(root.find(item => item.group === 'prettyPrint'));
@@ -979,7 +974,7 @@ suite('Unicode completions', () => {
   assert.strictEqual(queryOption(query, 'output'), 'braille');
   assert.deepStrictEqual(optionValues('output', ''), [
    'glyph', 'components', 'unicode', 'codepoint', 'name', 'details', 'full', 'braille',
-  'block-elements', 'iphone-blocks', 'emoji', 'binary', 'hex',
+  'block-elements', 'iphone-blocks', 'emoji', 'binary', 'hex', 'zalgo',
   ]);
   assert.deepStrictEqual(optionValues('render', ''), optionValues('output', ''));
  });
@@ -3001,6 +2996,12 @@ test('compacts Braille glyphs with a one-cell separator while preserving space w
 test('uses a two-cell compact Braille space between words', async () => {
  const rasterizer = () => ['11', '11', '11', '11'];
  assert.strictEqual(await textToBitmap('A B', 4, 'braille', { compact: true }, rasterizer), '⣿⠀⠀⠀⠀⣿');
+});
+
+test('uses a compact 3-space separator for whitespace in Zalgo mode', async () => {
+ const rasterizer = () => ['1', '0', '0', '0'];
+ const output = await textToBitmap('A B', 4, 'zalgo', { compact: true, zalgoStrategy: 'fast' }, rasterizer);
+ assert.strictEqual(output, ':̑   :̑');
 });
 
 test('uses two compact Braille rows for spaces at every raster size', async () => {

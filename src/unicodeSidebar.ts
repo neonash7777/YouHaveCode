@@ -1,12 +1,12 @@
 import * as vscode from 'vscode';
 import { filterKeys, outputValues, type DefaultFilterConfig, type FilterKey } from './unicodeCompletions';
-import { compatibilityTargets, fallbackCompatibilityProfiles, getTargetCodicon, getTargetSymbol, normalizePolicy, unsupportedGlyphCount, type CompatibilityBadgeStyle, type CompatibilityFallbackPolicy, type CompatibilityProfiles, type CompatibilityTarget, type CompatibilityTargetSettings } from './compatibilitySettings';
+import { compatibilityTargets, fallbackCompatibilityProfiles, getTargetCodicon, normalizePolicy, unsupportedGlyphCount, type CompatibilityBadgeStyle, type CompatibilityFallbackPolicy, type CompatibilityProfiles, type CompatibilityTarget, type CompatibilityTargetSettings } from './compatibilitySettings';
 import type { UnicodeEntry } from './unicodeData';
 import { applyEmojiPresentation, type EmojiPresentation } from './unicodeDeconstruction';
 import { parseGlyphVariantKey, rankGlyphVariants, type UsageStats } from './usageRanking';
 
-type SidebarGroup = 'recent' | 'frequent' | 'tags' | 'properties' | 'unicodeTable' | 'unicodeTableBlock' | 'unicodeTableSubBlock' | 'unicodeTableRow' | 'prettyPrint' | 'prettyPrintOutput' | 'prettyPrintSize' | 'prettyPrintWrap' | 'prettyPrintSpacing' | 'prettyPrintMapping' | 'prettyPrintFlow' | 'prettyPrintWrapDirection' | 'prettyPrintTransform' | 'prettyPrintFormats' | 'prettyPrintSettings' | 'prettyPrintDebug' | 'prettyPrintType' | 'prettyPrintFontFamilies' | 'prettyPrintFontActive' | 'prettyPrintFontInstalled' | 'prettyPrintFontBucket' | 'tools' | 'outputFormat' | 'defaultFilters' | 'compatibility' | 'compatibilityTarget' | 'compatibilityFallback' | 'compatibilityBadgeStyle';
-type PrettyPrintSetting = 'output' | 'size' | 'wrap' | 'compact' | 'mapping' | 'flow' | 'wrap-direction' | 'd4';
+type SidebarGroup = 'recent' | 'frequent' | 'tags' | 'properties' | 'unicodeTable' | 'unicodeTableBlock' | 'unicodeTableSubBlock' | 'unicodeTableRow' | 'prettyPrint' | 'prettyPrintOutput' | 'prettyPrintSize' | 'prettyPrintWrap' | 'prettyPrintSpacing' | 'prettyPrintMapping' | 'prettyPrintZalgoStrategy' | 'prettyPrintFlow' | 'prettyPrintWrapDirection' | 'prettyPrintTransform' | 'prettyPrintFormats' | 'prettyPrintSettings' | 'prettyPrintDebug' | 'prettyPrintType' | 'prettyPrintFontFamilies' | 'prettyPrintFontActive' | 'prettyPrintFontInstalled' | 'prettyPrintFontBucket' | 'tools' | 'outputFormat' | 'defaultFilters' | 'compatibility' | 'compatibilityTarget' | 'compatibilityFallback' | 'compatibilityBadgeStyle';
+type PrettyPrintSetting = 'output' | 'size' | 'wrap' | 'compact' | 'mapping' | 'flow' | 'wrap-direction' | 'd4' | 'zalgo-strategy';
 
 export interface UnicodeSidebarSource {
  entries(): Promise<readonly UnicodeEntry[]>;
@@ -32,6 +32,7 @@ export interface UnicodeSidebarSource {
   compatibility?(): { targets: CompatibilityTargetSettings; unknown: CompatibilityFallbackPolicy; localFont: CompatibilityFallbackPolicy; badgeStyle: CompatibilityBadgeStyle };
   compatibilityProfiles?(): Promise<CompatibilityProfiles>;
   renderGlyphOutput?(hex: string, presentation?: EmojiPresentation): Promise<string>;
+  recordDragUsage?(hex: string, presentation?: EmojiPresentation): Promise<void>;
 }
 export class UnicodeSidebarProvider implements vscode.TreeDataProvider<UnicodeSidebarItem>, vscode.TreeDragAndDropController<UnicodeSidebarItem> {
  readonly dropMimeTypes: readonly string[] = [];
@@ -43,9 +44,24 @@ export class UnicodeSidebarProvider implements vscode.TreeDataProvider<UnicodeSi
  constructor(private readonly source: UnicodeSidebarSource) {}
 
  async handleDrag(source: readonly UnicodeSidebarItem[], dataTransfer: vscode.DataTransfer): Promise<void> {
-  const outputs = await Promise.all(source.flatMap(item => item.hex ? [this.source.renderGlyphOutput?.(item.hex, item.presentation) ?? Promise.resolve('')] : []));
+  const glyphs = (await Promise.all(source.map(item => this.collectDragGlyphs(item)))).flat();
+  const outputs = await Promise.all(glyphs.map(({ hex, presentation }) => this.source.renderGlyphOutput?.(hex, presentation) ?? Promise.resolve('')));
   const text = outputs.filter(Boolean).join('');
   if (text) { dataTransfer.set('text/plain', new vscode.DataTransferItem(text)); }
+  await Promise.all(glyphs.map(({ hex, presentation }) => this.source.recordDragUsage?.(hex, presentation)));
+ }
+
+ // Recursively expands a dragged header (tag, table block/sub-block/row, etc.) into every glyph beneath it.
+ private async collectDragGlyphs(item: UnicodeSidebarItem, limit = 1000, depth = 0): Promise<{ hex: string; presentation?: EmojiPresentation }[]> {
+  if (item.hex) { return [{ hex: item.hex, presentation: item.presentation }]; }
+  if (depth > 4 || limit <= 0) { return []; }
+  const children = await this.getChildren(item);
+  const results: { hex: string; presentation?: EmojiPresentation }[] = [];
+  for (const child of children) {
+   if (results.length >= limit) { break; }
+   results.push(...await this.collectDragGlyphs(child, limit - results.length, depth + 1));
+  }
+  return results;
  }
 
  refresh(): void { this.changed.fire(undefined); }
@@ -54,7 +70,7 @@ export class UnicodeSidebarProvider implements vscode.TreeDataProvider<UnicodeSi
   if (!item) { this.refresh(); return; }
   const defaults = this.source.prettyPrintDefaults?.() ?? defaultPrettyPrintDefaults;
   item.description = prettyPrintHeaderDescription(setting, defaults[setting]);
-  item.id = `youhavecode.prettyPrint.${setting}.${defaults[setting]}`;
+  item.id = `youhavecode.prettyPrint.${setting}`;
   this.changed.fire(item);
  }
  refreshPrettyPrintHeaders(): void {
@@ -62,7 +78,7 @@ export class UnicodeSidebarProvider implements vscode.TreeDataProvider<UnicodeSi
   const defaults = this.source.prettyPrintDefaults?.() ?? defaultPrettyPrintDefaults;
   const headers = [...this.prettyPrintHeaders].map(([setting, item]) => {
    item.description = prettyPrintHeaderDescription(setting, defaults[setting]);
-    item.id = `youhavecode.prettyPrint.${setting}.${defaults[setting]}`;
+   item.id = `youhavecode.prettyPrint.${setting}`;
    return item;
   });
   this.changed.fire(headers);
@@ -135,9 +151,11 @@ export class UnicodeSidebarProvider implements vscode.TreeDataProvider<UnicodeSi
   if (defaults.flow !== 'auto') { flow.iconPath = this.source.directionIcon?.(defaults.flow) ?? flow.iconPath; }
   const wrapDirection = prettyPrintGroup('Wrap Direction', wrapDirectionLabel(defaults['wrap-direction']), 'arrow-swap', 'prettyPrintWrapDirection', 'wrap-direction');
   if (defaults['wrap-direction'] !== 'auto') { wrapDirection.iconPath = this.source.directionIcon?.(defaults['wrap-direction'], true) ?? wrapDirection.iconPath; }
+  const imageItem = action('Pretty Print Image…', 'Drop an image to convert it into the current bitmap text format', 'file-media', 'youhavecode.prettyPrintImage');
+  imageItem.contextValue = 'youhavecode.prettyPrintImage';
   const headers = [
     action('Pretty Print', `Apply ${prettyPrintOutputLabel(defaults.output)} with current settings`, 'play', 'youhavecode.prettyPrintWithDefaults'),
-    action('Pretty Print Image…', 'Drop an image to convert it into the current bitmap text format', 'file-media', 'youhavecode.prettyPrintImage'),
+    imageItem,
     group('Pretty Print Settings', 'Choose bitmap type, size, wrapping, spacing, flow, transform, and font precedence', 'settings', 'prettyPrintSettings'),
     ...(this.source.developerDebugMode?.() ? [group('Pretty Print Debug', 'Developer-only Pretty Print diagnostics and sweeps', 'debug', 'prettyPrintDebug')] : []),
   ];
@@ -150,20 +168,27 @@ export class UnicodeSidebarProvider implements vscode.TreeDataProvider<UnicodeSi
     const choices = prettyPrintValues(setting, defaults.flow).map(value => {
     const selected = value === defaults[setting];
   const choice = action(prettyPrintChoiceLabel(setting, value), selected ? 'selected' : undefined, selected ? 'check' : prettyPrintIcon(setting), 'youhavecode.setSidebarPrettyPrintSetting', [setting, value]);
+  choice.id = `youhavecode.prettyPrint.${setting}.choice.${value}`;
   if (selected) { choice.description = 'selected'; }
     if (setting === 'd4' && value !== defaults[setting]) { choice.iconPath = this.source.d4Icon?.(value) ?? choice.iconPath; }
     if ((setting === 'flow' || setting === 'wrap-direction') && value !== 'auto' && !selected) { choice.iconPath = this.source.directionIcon?.(value, setting === 'wrap-direction') ?? choice.iconPath; }
-     if (setting === 'output') { choice.contextValue = 'youhavecode.prettyPrintOutputChoice'; choice.prettyPrintOutput = value; }
+     if (setting === 'output') {
+      choice.contextValue = value === 'zalgo' ? 'youhavecode.prettyPrintOutputChoice.zalgo' : 'youhavecode.prettyPrintOutputChoice';
+      choice.prettyPrintOutput = value;
+     }
      return choice;
     });
       if (setting === 'size') {
        const presetSizes = prettyPrintValues('size', defaults.flow);
        if (!presetSizes.includes(defaults.size)) {
         const custom = action('Custom size…', `${defaults.size.replace('x', ' × ')} pixels`, 'check', 'youhavecode.setSidebarPrettyPrintCustomSize');
+        custom.id = `youhavecode.prettyPrint.size.choice.custom`;
         custom.description = 'selected';
         choices.push(custom);
        } else {
-        choices.push(action('Custom size…', 'Enter a square raster size from 8 through 128 pixels', 'edit', 'youhavecode.setSidebarPrettyPrintCustomSize'));
+        const custom = action('Custom size…', 'Enter a square raster size from 8 through 128 pixels', 'edit', 'youhavecode.setSidebarPrettyPrintCustomSize');
+        custom.id = `youhavecode.prettyPrint.size.choice.custom`;
+        choices.push(custom);
        }
       }
       if (setting === 'wrap') { choices.push(editorWrapItem(this.source.editorWrap?.())); }
@@ -177,6 +202,7 @@ export class UnicodeSidebarProvider implements vscode.TreeDataProvider<UnicodeSi
     action('Emoji Art', undefined, 'symbol-array', 'youhavecode.prettyPrintSelectionAs', ['emoji']),
     action('Binary Art', undefined, 'symbol-numeric', 'youhavecode.prettyPrintSelectionAs', ['binary']),
     action('Hex Art', undefined, 'symbol-number', 'youhavecode.prettyPrintSelectionAs', ['hex']),
+    action('Zalgo / Combining Art', undefined, 'symbol-array', 'youhavecode.prettyPrintSelectionAs', ['zalgo']),
    ];
   }
   if (item.group === 'prettyPrintSettings') {
@@ -193,6 +219,7 @@ export class UnicodeSidebarProvider implements vscode.TreeDataProvider<UnicodeSi
     prettyPrintGroup('Line Length', defaults.wrap, 'word-wrap', 'prettyPrintWrap', 'wrap'),
     prettyPrintGroup('Spacing', prettyPrintCompactLabel(defaults.compact), 'text-size', 'prettyPrintSpacing', 'compact'),
     prettyPrintGroup('Glyph Mapping', defaults.mapping === 'baseline-tight' ? 'Baseline Tight' : defaults.mapping === 'baseline' ? 'Baseline' : 'Square', 'symbol-text', 'prettyPrintMapping', 'mapping'),
+    prettyPrintGroup('Zalgo Strategy', defaults['zalgo-strategy'] ?? 'detailed', 'sparkle', 'prettyPrintZalgoStrategy', 'zalgo-strategy'),
     flow,
     wrapDirection,
     transform,
@@ -245,9 +272,13 @@ export class UnicodeSidebarProvider implements vscode.TreeDataProvider<UnicodeSi
   }
   if (item.group === 'outputFormat') {
    const current = this.source.output?.() ?? 'glyph';
-   return [
-    ...outputValues.map(value => action(outputLabel(value), `Set default output to ${value}`, value === current ? 'check' : prettyPrintOutputValues.includes(value) ? 'symbol-color' : 'symbol-string', 'youhavecode.setSidebarOutputFormat', [value])),
-   ];
+   return outputValues.map(value => {
+    const choice = action(outputLabel(value), `Set default output to ${value}`, value === current ? 'check' : prettyPrintOutputValues.includes(value) ? 'symbol-color' : 'symbol-string', 'youhavecode.setSidebarOutputFormat', [value]);
+    choice.id = `youhavecode.outputFormat.choice.${value}`;
+    choice.prettyPrintOutput = value;
+    choice.contextValue = value === 'zalgo' ? 'youhavecode.outputFormatChoice.zalgo' : 'youhavecode.outputFormatChoice';
+    return choice;
+   });
   }
   if (item.group === 'prettyPrintFormats') {
    return [
@@ -278,7 +309,6 @@ export class UnicodeSidebarProvider implements vscode.TreeDataProvider<UnicodeSi
    return [
     action('Presets…', 'Set all platform policies (Enforce All, Warn All, Dismiss All, Current Platform, Desktop OS, Typical Consumer Stack)', 'layers', 'youhavecode.setCompatibilityPreset'),
     ...compatibilityTargets.map(({ key, label }) => {
-     const symbol = getTargetSymbol(key);
      const codicon = getTargetCodicon(key);
      const policy = normalizePolicy(configured.targets[key]?.policy);
      const count = unsupportedGlyphCount(entries, key, profiles, configured.targets[key]?.version);
@@ -301,8 +331,10 @@ export class UnicodeSidebarProvider implements vscode.TreeDataProvider<UnicodeSi
   if (item.group === 'compatibilityBadgeStyle') {
    const currentStyle = this.source.compatibility?.().badgeStyle;
    return [
-    action('Symbol (🍎/)', 'Use emoji symbols for badges', currentStyle === 'symbol' ? 'check' : 'circle-outline', 'youhavecode.setCompatibilityBadgeStyle', ['symbol']),
-    action('Letter (Mac)', 'Use letter abbreviations for badges', currentStyle === 'letter' ? 'check' : 'circle-outline', 'youhavecode.setCompatibilityBadgeStyle', ['letter']),    action('Product Icons', 'Use VS Code product icons for badges', currentStyle === 'icon' ? 'check' : 'circle-outline', 'youhavecode.setCompatibilityBadgeStyle', ['icon']),   ];
+    action('Product Icons', 'Use VS Code product icons for badges', currentStyle === 'icon' ? 'check' : 'circle-outline', 'youhavecode.setCompatibilityBadgeStyle', ['icon']),
+    action('Abbreviated Name (Mac)', 'Use abbreviated platform names for badges', currentStyle === 'letter' ? 'check' : 'circle-outline', 'youhavecode.setCompatibilityBadgeStyle', ['letter']),
+    action('Name (macOS)', 'Use full platform names for badges', currentStyle === 'name' ? 'check' : 'circle-outline', 'youhavecode.setCompatibilityBadgeStyle', ['name']),
+   ];
   }
   if (item.group === 'compatibilityTarget' && item.target) {
    const current = normalizePolicy(this.source.compatibility?.().targets[item.target]?.policy);
@@ -426,12 +458,20 @@ const compareEntriesByCodepoint = (left: UnicodeEntry, right: UnicodeEntry) => e
 const between = (value: number, start: number, end: number) => start <= value && value <= end;
 const rangeLabel = (start: number, end: number) => `U+${start.toString(16).toUpperCase().padStart(4, '0')}..U+${end.toString(16).toUpperCase().padStart(4, '0')}`;
 
-const defaultPrettyPrintDefaults: Readonly<Record<PrettyPrintSetting, string>> = { output: 'braille', size: '32x32', wrap: 'auto', compact: 'on', mapping: 'baseline', flow: 'auto', 'wrap-direction': 'auto', d4: 'identity' };
+const defaultPrettyPrintDefaults: Readonly<Record<PrettyPrintSetting, string>> = { output: 'braille', size: '32x32', wrap: 'auto', compact: 'on', mapping: 'baseline', flow: 'auto', 'wrap-direction': 'auto', d4: 'identity', 'zalgo-strategy': 'sculpt' };
 const prettyPrintValues = (setting: PrettyPrintSetting, flow = 'lr'): string[] => ({
-  output: ['braille', 'block-elements', 'iphone-blocks', 'emoji', 'binary', 'hex'], size: ['8x8', '12x12', '16x16', '24x24', '32x32', '48x48', '64x64', '96x96', '128x128'],
+  output: ['braille', 'block-elements', 'iphone-blocks', 'emoji', 'binary', 'hex', 'zalgo'], size: ['8x8', '12x12', '16x16', '24x24', '32x32', '48x48', '64x64', '96x96', '128x128'],
  wrap: ['none', 'glyph', 'auto', '16', '32', '40', '80', '120'], compact: ['on', 'off'], mapping: ['square', 'baseline', 'baseline-tight'], flow: ['auto', 'lr', 'rl', 'ud', 'du'], 'wrap-direction': flow === 'auto' ? ['auto'] : ['auto', ...(flow === 'lr' || flow === 'rl' ? ['ud', 'du'] : ['lr', 'rl'])], d4: ['identity', 'rotate-90', 'rotate-180', 'rotate-270', 'mirror-left-right', 'flip-top-bottom', 'reflect-slash', 'reflect-backslash'],
+ 'zalgo-strategy': ['sculpt', 'detailed', 'calculated', 'hatching', 'fast'],
 })[setting];
-const prettyPrintOutputLabel = (value: string) => ({ braille: 'Braille Art', 'block-elements': 'Block Elements Art', 'iphone-blocks': 'Solid Square Art', emoji: 'Emoji Art', binary: 'Binary Art', hex: 'Hex Art' }[value] ?? value);
+const prettyPrintOutputLabel = (value: string) => ({ braille: 'Braille Art', 'block-elements': 'Block Elements Art', 'iphone-blocks': 'Solid Square Art', emoji: 'Emoji Art', binary: 'Binary Art', hex: 'Hex Art', zalgo: 'Zalgo / Combining Art' }[value] ?? value);
+const prettyPrintZalgoStrategyLabel = (value: string) => ({
+ sculpt: 'Sculpt (3-Base Glyphs)',
+ detailed: 'Detailed (Micro-ligatures)',
+ calculated: 'Calculated (Bridges & Nodes)',
+ hatching: 'Hatching (Grayscale Mesh)',
+ fast: 'Fast (4-bit scanlines)',
+}[value] ?? value);
 const flowLabel = (value: string) => ({ lr: 'Left to right', rl: 'Right to left', ud: 'Top to bottom', du: 'Bottom to top' }[value] ?? value);
 const wrapDirectionLabel = (value: string) => value === 'auto' ? 'Auto' : flowLabel(value);
 const prettyPrintCompactValue = (value: string | boolean | undefined): 'on' | 'off' => value === 'off' || value === false ? 'off' : 'on';
@@ -439,12 +479,12 @@ const prettyPrintCompactLabel = (value: string | boolean | undefined): 'Compact'
 const prettyPrintChoiceLabel = (setting: PrettyPrintSetting, value: string) => setting === 'output' ? prettyPrintOutputLabel(value)
  : setting === 'size' ? `${value.replace('x', ' × ')} pixels` : setting === 'wrap' ? value === 'none' ? 'No Wrap' : value === 'glyph' ? 'Match Glyph Size' : value === 'auto' ? 'Auto (editor column)' : `${value} text cells`
  : setting === 'compact' ? prettyPrintCompactLabel(value) : setting === 'mapping' ? value === 'square' ? 'Square' : value === 'baseline-tight' ? 'Baseline Tight' : 'Baseline' : setting === 'flow' ? value === 'auto' ? 'Auto (transform)' : flowLabel(value)
- : setting === 'wrap-direction' ? wrapDirectionLabel(value) : d4Label(value);
+ : setting === 'wrap-direction' ? wrapDirectionLabel(value) : setting === 'zalgo-strategy' ? prettyPrintZalgoStrategyLabel(value) : d4Label(value);
 const d4Label = (value: string) => ({ identity: 'Identity', 'rotate-90': 'Rotate 90°', 'rotate-180': 'Rotate 180°', 'rotate-270': 'Rotate 270°', 'mirror-left-right': 'Mirror', 'flip-top-bottom': 'Flip', 'reflect-slash': 'Diagonal', 'reflect-backslash': 'AntiDiagonal' }[value] ?? value);
-const prettyPrintIcon = (setting: PrettyPrintSetting) => ({ output: 'symbol-array', size: 'symbol-ruler', wrap: 'word-wrap', compact: 'text-size', mapping: 'symbol-text', flow: 'arrow-right', 'wrap-direction': 'arrow-swap', d4: 'mirror' })[setting];
+const prettyPrintIcon = (setting: PrettyPrintSetting) => ({ output: 'symbol-array', size: 'symbol-ruler', wrap: 'word-wrap', compact: 'text-size', mapping: 'symbol-text', flow: 'arrow-right', 'wrap-direction': 'arrow-swap', d4: 'mirror', 'zalgo-strategy': 'sparkle' })[setting];
 const prettyPrintGroup = (label: string, value: string, icon: string, group: SidebarGroup, setting: PrettyPrintSetting) => {
  const item = nested(label, icon, group, {});
- item.id = `youhavecode.prettyPrint.${setting}.${value}`;
+ item.id = `youhavecode.prettyPrint.${setting}`;
  item.description = prettyPrintHeaderDescription(setting, value);
  item.prettyPrintSetting = setting;
  return item;
@@ -500,9 +540,9 @@ const defaultItem = (label: string, kind: 'property' | 'term', key: string, disa
 
 const outputLabel = (value: string) => ({
  glyph: 'Glyph / symbol', components: 'Glyph components', unicode: 'JSON escapes', codepoint: 'Code points', name: 'Unicode names', details: 'Details', full: 'Full details',
- braille: 'Braille dots', 'block-elements': 'Block Elements', 'iphone-blocks': 'Solid square art', emoji: 'Emoji Art', binary: 'Binary', hex: 'Hex',
+ braille: 'Braille dots', 'block-elements': 'Block Elements', 'iphone-blocks': 'Solid square art', emoji: 'Emoji Art', binary: 'Binary', hex: 'Hex', zalgo: 'Zalgo / Combining Art',
 }[value] ?? value);
-const prettyPrintOutputValues = ['braille', 'block-elements', 'iphone-blocks', 'emoji', 'binary', 'hex'];
+const prettyPrintOutputValues = ['braille', 'block-elements', 'iphone-blocks', 'emoji', 'binary', 'hex', 'zalgo'];
 
 const tagItem = (tag: string, hexes: readonly string[], entries: ReadonlyMap<string, UnicodeEntry>, usage: UsageStats, recentPresentation?: (hex: string) => EmojiPresentation | undefined) => {
  const glyphLabel = (hex: string) => {

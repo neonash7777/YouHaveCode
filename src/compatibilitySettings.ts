@@ -2,16 +2,21 @@ import type { UnicodeEntry } from './unicodeData';
 
 export const compatibilityTargets = [
  { key: 'macos', label: 'macOS' },
+ { key: 'ios', label: 'iOS' },
  { key: 'windows', label: 'Windows' },
  { key: 'ubuntu', label: 'Ubuntu' },
- { key: 'ios', label: 'iOS' },
  { key: 'android-aosp', label: 'Android(AOSP)' },
 ] as const;
 
 export type CompatibilityTarget = typeof compatibilityTargets[number]['key'];
 export type CompatibilityPolicy = 'enforced' | 'warned' | 'dismissed';
 export type CompatibilityFallbackPolicy = 'warn' | 'permitted' | 'unlist';
-export type CompatibilityBadgeStyle = 'symbol' | 'letter' | 'icon';
+export type CompatibilityBadgeStyle = 'icon' | 'letter' | 'name';
+
+// Falls back to 'icon' for stale/invalid persisted values (e.g. the removed 'symbol' style).
+export function normalizeBadgeStyle(value: string | undefined): CompatibilityBadgeStyle {
+ return value === 'letter' || value === 'name' ? value : 'icon';
+}
 
 // Search words that should surface a "change compatibility" suggestion instead of a glyph result.
 export const compatibilityDraftAliases: Record<string, readonly CompatibilityTarget[]> = {
@@ -32,25 +37,22 @@ export function normalizePolicy(policy: string | undefined): CompatibilityPolicy
  return 'warned';
 }
 
-export function getTargetSymbol(target: CompatibilityTarget, isMac: boolean = typeof process !== 'undefined' && process.platform === 'darwin'): string {
- if (target === 'macos' && isMac) { return ''; }
- switch (target) {
-  case 'macos': return '🍎';
-  case 'windows': return '⊞';
-  case 'ubuntu': return '🐧';
-  case 'android-aosp': return '🤖';
-  case 'ios': return '📱';
- }
-}
-
 export function getTargetCodicon(target: CompatibilityTarget): string {
  switch (target) {
   case 'ios': return 'device-mobile';
-  case 'android-aosp': return 'device-mobile';
-  case 'macos': return 'device-desktop';
-  case 'windows': return 'device-desktop';
+  case 'android-aosp': return 'hubot';
+  case 'macos': return 'vm';
+  case 'windows': return 'vm';
   case 'ubuntu': return 'terminal-linux';
  }
+}
+
+// macOS gets the real Apple logo glyph (Private Use Area, not an emoji) instead of a generic desktop codicon.
+// EXPERIMENT: ubuntu uses the ~spin modifier to test animated codicons in completion documentation.
+export function iconGlyph(target: CompatibilityTarget): string {
+ if (target === 'macos') { return '\uF8FF'; }
+ const codicon = getTargetCodicon(target);
+ return target === 'ubuntu' ? `$(${codicon}~spin)` : `$(${codicon})`;
 }
 
 export const targetLetterBadges: Record<CompatibilityTarget, string> = {
@@ -61,25 +63,24 @@ export const targetLetterBadges: Record<CompatibilityTarget, string> = {
  ubuntu: 'Li',
 };
 
-export interface PlatformBadgeConfig { glyph?: string; label?: string; fallback?: string; codicon?: string }
+export interface PlatformBadgeConfig { label?: string; fallback?: string; codicon?: string }
 export interface CompatibilityTargetSetting { version: string; policy: CompatibilityPolicy }
 export type CompatibilityTargetSettings = Record<CompatibilityTarget, CompatibilityTargetSetting>;
 export interface CompatibilityFinding { target: CompatibilityTarget; label: string; configuredVersion: string; requiredVersion: string; policy: CompatibilityPolicy; reason: string }
 export interface FontCoverageProfile { ranges: readonly string[]; source?: string; coverageMode?: string; fontCount?: number; codepointCount?: number }
-export interface CompatibilityProfiles { schemaVersion: 1; emojiPlatformSupport: Record<string, readonly CompatibilityTargetEvidence[]>; fontCoverage?: Partial<Record<CompatibilityTarget, Record<string, FontCoverageProfile>>>; badges?: Partial<Record<CompatibilityTarget, string>>; symbols?: Partial<Record<CompatibilityTarget, string>>; platformBadges?: Partial<Record<CompatibilityTarget, PlatformBadgeConfig>> }
+export interface CompatibilityProfiles { schemaVersion: 1; emojiPlatformSupport: Record<string, readonly CompatibilityTargetEvidence[]>; fontCoverage?: Partial<Record<CompatibilityTarget, Record<string, FontCoverageProfile>>>; badges?: Partial<Record<CompatibilityTarget, string>>; platformBadges?: Partial<Record<CompatibilityTarget, PlatformBadgeConfig>> }
 
 interface CompatibilityTargetEvidence { target: CompatibilityTarget; version: string }
 
 export const fallbackCompatibilityProfiles: CompatibilityProfiles = {
  schemaVersion: 1,
  badges: { ios: 'iOS', 'android-aosp': 'An', macos: 'Mac', windows: 'Wi', ubuntu: 'Li' },
- symbols: { ios: '📱', 'android-aosp': '🤖', macos: '🍎', windows: '⊞', ubuntu: '🐧' },
  platformBadges: {
-  macos: { glyph: '🍎', label: 'macOS', fallback: 'Mac', codicon: 'desktop-download' },
-  windows: { glyph: '⊞', label: 'Windows', fallback: 'Wi', codicon: 'desktop-download' },
-  ubuntu: { glyph: '🐧', label: 'Ubuntu / Linux', fallback: 'Li', codicon: 'terminal-linux' },
-  'android-aosp': { glyph: '🤖', label: 'Android(AOSP)', fallback: 'An', codicon: 'device-mobile' },
-  ios: { glyph: '📱', label: 'iOS / iPhone', fallback: 'iOS', codicon: 'device-mobile' },
+  macos: { label: 'macOS', fallback: 'Mac', codicon: 'vm' },
+  windows: { label: 'Windows', fallback: 'Wi', codicon: 'vm' },
+  ubuntu: { label: 'Ubuntu / Linux', fallback: 'Li', codicon: 'terminal-linux' },
+  'android-aosp': { label: 'Android(AOSP)', fallback: 'An', codicon: 'device-mobile' },
+  ios: { label: 'iOS / iPhone', fallback: 'iOS', codicon: 'device-mobile' },
  },
  fontCoverage: {},
  emojiPlatformSupport: {
@@ -109,7 +110,6 @@ export function parseCompatibilityProfiles(json: string | Uint8Array): Compatibi
   emojiPlatformSupport,
   fontCoverage: parseFontCoverage(parsed.fontCoverage, parsed.platforms, parsed.common, parsed.commonEmoji, knownTargets),
   badges: parsed.badges as Partial<Record<CompatibilityTarget, string>> | undefined,
-  symbols: parsed.symbols as Partial<Record<CompatibilityTarget, string>> | undefined,
   platformBadges: parsePlatformBadges(parsed.platformBadges),
  };
 }
@@ -120,11 +120,10 @@ function parsePlatformBadges(value: unknown): Partial<Record<CompatibilityTarget
  for (const [rawKey, item] of Object.entries(value as Record<string, unknown>)) {
   const target = normalizeTargetKey(rawKey);
   if (!target || !item || typeof item !== 'object') { continue; }
-  const glyph = String((item as { glyph?: unknown }).glyph ?? '').trim();
   const label = String((item as { label?: unknown }).label ?? '').trim();
   const fallback = String((item as { fallback?: unknown }).fallback ?? '').trim();
   const codicon = String((item as { codicon?: unknown }).codicon ?? '').trim();
-  result[target] = { glyph, label, fallback, codicon };
+  result[target] = { label, fallback, codicon };
  }
  return Object.keys(result).length ? result : undefined;
 }
@@ -226,9 +225,27 @@ function normalizeRange(range: unknown): string | undefined {
  return undefined;
 }
 
-export const defaultCompatibilityTargets = (): CompatibilityTargetSettings => Object.fromEntries(
- compatibilityTargets.map(({ key }) => [key, { version: 'current', policy: 'warned' }]),
-) as CompatibilityTargetSettings;
+export const currentPlatformVersions: Record<CompatibilityTarget, string> = {
+ macos: '14.4',
+ ios: '17.4',
+ windows: '11-24H2',
+ ubuntu: '24.04',
+ 'android-aosp': '14',
+};
+
+export function resolveTargetVersion(target: CompatibilityTarget, version?: string): string {
+ const trimmed = version?.trim();
+ if (!trimmed || trimmed === 'current') {
+  return currentPlatformVersions[target] ?? 'current';
+ }
+ return trimmed;
+}
+
+export function defaultCompatibilityTargets(): CompatibilityTargetSettings {
+ return Object.fromEntries(
+  compatibilityTargets.map(({ key }) => [key, { version: 'current', policy: 'warned' }]),
+ ) as CompatibilityTargetSettings;
+}
 
 export function resolveCompatibilityTargets(configured: Partial<Record<CompatibilityTarget, Partial<{ version?: string; policy?: string }>>>): CompatibilityTargetSettings {
  const defaults = defaultCompatibilityTargets();
@@ -254,9 +271,12 @@ export function emojiCompatibilityFindings(emojiVersion: string | undefined, tar
   const setting = targets[evidence.target];
   const policy = normalizePolicy(setting?.policy);
   if (policy === 'dismissed') { return []; }
-  if (setting?.version && setting.version !== 'current' && setting.version !== 'any' && compareLooseVersions(setting.version, evidence.version) >= 0) { return []; }
+  const configuredVersion = setting?.version?.trim() || 'current';
+  if (configuredVersion === 'any') { return []; }
+  const effectiveVersion = resolveTargetVersion(evidence.target, configuredVersion);
+  if (compareLooseVersions(effectiveVersion, evidence.version) >= 0) { return []; }
   const label = compatibilityTargets.find(target => target.key === evidence.target)?.label ?? evidence.target;
-  return [{ target: evidence.target, label, configuredVersion: setting?.version ?? 'current', requiredVersion: evidence.version, policy, reason: `Emoji ${version}` }];
+  return [{ target: evidence.target, label, configuredVersion, requiredVersion: evidence.version, policy, reason: `Emoji ${version}` }];
  });
 }
 
@@ -265,10 +285,13 @@ export function fontCoverageFindings(codepoints: readonly number[], targets: Com
   const setting = targets[key];
   const policy = normalizePolicy(setting?.policy);
   if (policy === 'dismissed') { return []; }
-  const profile = profiles.fontCoverage?.[key]?.[setting?.version ?? 'current'] ?? profiles.fontCoverage?.[key]?.['current'];
+  const configuredVersion = setting?.version?.trim() || 'current';
+  if (configuredVersion === 'any') { return []; }
+  const effectiveVersion = resolveTargetVersion(key, configuredVersion);
+  const profile = profiles.fontCoverage?.[key]?.[effectiveVersion] ?? profiles.fontCoverage?.[key]?.[configuredVersion] ?? profiles.fontCoverage?.[key]?.['current'];
   if (!profile) { return []; }
   const missing = codepoints.filter(codepoint => !rangeListContains(profile.ranges, codepoint));
-  return missing.length ? [{ target: key, label, configuredVersion: setting?.version ?? 'current', requiredVersion: 'font-cmap', policy, reason: `${missing.length} scalar${missing.length === 1 ? '' : 's'} missing from system font cmap` }] : [];
+  return missing.length ? [{ target: key, label, configuredVersion, requiredVersion: 'font-cmap', policy, reason: `${missing.length} scalar${missing.length === 1 ? '' : 's'} missing from system font cmap` }] : [];
  });
 }
 
@@ -295,15 +318,22 @@ export function unsupportedGlyphCount(
 }
 
 export function hasCompleteFontCoverageEvidence(targets: CompatibilityTargetSettings, profiles: CompatibilityProfiles = fallbackCompatibilityProfiles): boolean {
- return compatibilityTargets.every(({ key }) => normalizePolicy(targets[key]?.policy) === 'dismissed' || !!(profiles.fontCoverage?.[key]?.[targets[key]?.version ?? 'current'] ?? profiles.fontCoverage?.[key]?.['current']));
+ return compatibilityTargets.every(({ key }) => {
+  if (normalizePolicy(targets[key]?.policy) === 'dismissed') { return true; }
+  const configuredVersion = targets[key]?.version?.trim() || 'current';
+  const effectiveVersion = resolveTargetVersion(key, configuredVersion);
+  return !!(profiles.fontCoverage?.[key]?.[effectiveVersion] ?? profiles.fontCoverage?.[key]?.[configuredVersion] ?? profiles.fontCoverage?.[key]?.['current']);
+ });
 }
 
 export function unknownCompatibilityFindings(targets: CompatibilityTargetSettings, profiles: CompatibilityProfiles = fallbackCompatibilityProfiles, policy: CompatibilityFallbackPolicy = 'warn'): CompatibilityFinding[] {
  if (policy !== 'warn') { return []; }
  return compatibilityTargets.flatMap(({ key, label }) => {
    const setting = targets[key];
-   return normalizePolicy(setting?.policy) !== 'dismissed' && !(profiles.fontCoverage?.[key]?.[setting?.version ?? 'current'] ?? profiles.fontCoverage?.[key]?.['current'])
-    ? [{ target: key, label, configuredVersion: setting?.version ?? 'current', requiredVersion: 'unknown', policy: 'warned', reason: 'No bundled platform font coverage profile' }]
+   const configuredVersion = setting?.version?.trim() || 'current';
+   const effectiveVersion = resolveTargetVersion(key, configuredVersion);
+   return normalizePolicy(setting?.policy) !== 'dismissed' && !(profiles.fontCoverage?.[key]?.[effectiveVersion] ?? profiles.fontCoverage?.[key]?.[configuredVersion] ?? profiles.fontCoverage?.[key]?.['current'])
+    ? [{ target: key, label, configuredVersion, requiredVersion: 'unknown', policy: 'warned', reason: 'No bundled platform font coverage profile' }]
     : [];
  });
 }
@@ -313,28 +343,20 @@ export function compatibilityWarningText(findings: readonly CompatibilityFinding
  return warnings.length ? warnings.map(finding => finding.requiredVersion === 'font-cmap' ? `${finding.label} missing font` : finding.requiredVersion === 'unknown' ? `${finding.label} no evidence` : `${finding.label} < ${finding.requiredVersion}`).join(', ') : undefined;
 }
 
-export function compatibilityWarningBadge(findings: readonly CompatibilityFinding[], profiles: CompatibilityProfiles = fallbackCompatibilityProfiles, style: CompatibilityBadgeStyle = 'symbol'): string | undefined {
+export function compatibilityWarningBadge(findings: readonly CompatibilityFinding[], profiles: CompatibilityProfiles = fallbackCompatibilityProfiles, style: CompatibilityBadgeStyle = 'icon'): string | undefined {
  const warningTargets = new Set(findings.filter(finding => normalizePolicy(finding.policy) === 'warned').map(finding => finding.target));
  if (style === 'icon') {
-  const icons = [...new Set(compatibilityTargets.filter(({ key }) => warningTargets.has(key)).map(({ key }) => getTargetCodicon(key)))];
-  return icons.length ? `$(warning)(${icons.map(icon => `$(${icon})`).join('')})` : undefined;
+  const icons = [...new Set(compatibilityTargets.filter(({ key }) => warningTargets.has(key)).map(({ key }) => iconGlyph(key)))];
+  return icons.length ? `$(warning)(${icons.join('')})` : undefined;
  }
- const isMac = typeof process !== 'undefined' && process.platform === 'darwin';
- const codes = [...new Set(compatibilityTargets.map(({ key }) => {
-  if (!warningTargets.has(key)) { return ''; }
-  if (style === 'symbol') {
-   if (key === 'macos' && isMac) { return ''; }
-   const badgeConfig = profiles.platformBadges?.[key];
-   if (badgeConfig?.glyph) { return badgeConfig.glyph; }
-   const symbolOverride = profiles.symbols?.[key];
-   if (symbolOverride && (key !== 'macos' || symbolOverride !== '🍎')) { return symbolOverride; }
-   return getTargetSymbol(key, isMac);
-  }
+ const warned = compatibilityTargets.filter(({ key }) => warningTargets.has(key));
+ if (!warned.length) { return undefined; }
+ if (style === 'name') { return `(!${warned.map(({ label }) => label).join(', ')})`; }
+ const codes = warned.map(({ key }) => {
   const badgeConfig = profiles.platformBadges?.[key];
-  if (badgeConfig?.fallback) { return badgeConfig.fallback; }
-  return profiles.badges?.[key] ?? fallbackCompatibilityProfiles.badges?.[key] ?? targetLetterBadges[key] ?? key;
- }).filter(Boolean))].join('');
- return codes ? `(!${codes})` : undefined;
+  return badgeConfig?.fallback ?? profiles.badges?.[key] ?? fallbackCompatibilityProfiles.badges?.[key] ?? targetLetterBadges[key] ?? key;
+ }).join('');
+ return `(!${codes})`;
 }
 
 export function hasEmojiCompatibilityEvidence(emojiVersion: string | undefined, profiles: CompatibilityProfiles = fallbackCompatibilityProfiles): boolean {
@@ -342,36 +364,43 @@ export function hasEmojiCompatibilityEvidence(emojiVersion: string | undefined, 
  return !!version && version in profiles.emojiPlatformSupport;
 }
 
-export function unknownCompatibilityWarningBadge(policy: CompatibilityFallbackPolicy, style: CompatibilityBadgeStyle = 'symbol'): string | undefined {
+export function unknownCompatibilityWarningBadge(policy: CompatibilityFallbackPolicy, style: CompatibilityBadgeStyle = 'icon'): string | undefined {
  if (policy !== 'warn') { return undefined; }
- return style === 'icon' ? '$(warning)($(question))' : style === 'symbol' ? '(!❓)' : '(!?)';
+ return style === 'icon' ? '$(warning)($(question))' : style === 'name' ? '(!Unknown)' : '(!?)';
 }
 
 export function unknownCompatibilityWarningText(policy: CompatibilityFallbackPolicy): string | undefined { return policy === 'warn' ? 'No bundled platform evidence' : undefined; }
 
-// Per-platform status, always rendered regardless of warnings; style selects symbol/letter/icon representation.
-export function compatibilityStatusBadges(findings: readonly CompatibilityFinding[], targets: CompatibilityTargetSettings, profiles: CompatibilityProfiles = fallbackCompatibilityProfiles, style: CompatibilityBadgeStyle = 'symbol'): string {
+// Per-platform status, always rendered regardless of warnings; style selects icon/letter/name representation.
+export function compatibilityStatusBadges(findings: readonly CompatibilityFinding[], targets: CompatibilityTargetSettings, profiles: CompatibilityProfiles = fallbackCompatibilityProfiles, style: CompatibilityBadgeStyle = 'icon'): string {
  const warningTargets = new Set(findings.filter(finding => normalizePolicy(finding.policy) === 'warned').map(finding => finding.target));
  const active = compatibilityTargets.filter(({ key }) => normalizePolicy(targets[key]?.policy) !== 'dismissed');
  if (style === 'icon') {
-  return active.map(({ key, label }) => `$(${getTargetCodicon(key)}) ${label} $(${warningTargets.has(key) ? 'warning' : 'check'})`).join(' · ');
+  return active.map(({ key, label }) => `${iconGlyph(key)} ${label} $(${warningTargets.has(key) ? 'warning' : 'check'})`).join(' · ');
  }
- return active.map(({ key }) => {
+ return active.map(({ key, label }) => {
    const badgeConfig = profiles.platformBadges?.[key];
-   const symbol = style === 'symbol'
-    ? badgeConfig?.glyph ?? profiles.symbols?.[key] ?? getTargetSymbol(key, false)
-    : badgeConfig?.fallback ?? profiles.badges?.[key] ?? fallbackCompatibilityProfiles.badges?.[key] ?? targetLetterBadges[key] ?? key;
-   return `${symbol}${warningTargets.has(key) ? '⚠' : '✓'}`;
+   const name = style === 'name' ? label : badgeConfig?.fallback ?? profiles.badges?.[key] ?? fallbackCompatibilityProfiles.badges?.[key] ?? targetLetterBadges[key] ?? key;
+   return `${name}${warningTargets.has(key) ? '⚠' : '✓'}`;
   }).join(' ');
 }
 
-// Readable "what it has" platform list for tooltips, e.g. "macOS, iOS, Windows".
-export function compatibilitySupportedNames(findings: readonly CompatibilityFinding[], targets: CompatibilityTargetSettings): string {
+// "What it has" platform list, no warning marks -- only supported platforms are listed at all. Style selects icon/letter/name.
+export function compatibilitySupportedList(findings: readonly CompatibilityFinding[], targets: CompatibilityTargetSettings, style: CompatibilityBadgeStyle = 'name'): string {
+ const warningTargets = new Set(findings.filter(finding => normalizePolicy(finding.policy) === 'warned').map(finding => finding.target));
+ const supported = compatibilityTargets.filter(({ key }) => normalizePolicy(targets[key]?.policy) !== 'dismissed' && !warningTargets.has(key));
+ if (style === 'icon') { return supported.map(({ key }) => `${iconGlyph(key)}${targetLetterBadges[key]}`).join(', '); }
+ if (style === 'letter') { return supported.map(({ key }) => targetLetterBadges[key]).join(', '); }
+ return supported.map(({ label }) => label).join(', ');
+}
+
+// Compact lowercase letter-abbreviation token list for the "(compat=...)" filter-style summary, e.g. "mac-ios-wi-li-an".
+export function compatibilitySupportedTokens(findings: readonly CompatibilityFinding[], targets: CompatibilityTargetSettings): string {
  const warningTargets = new Set(findings.filter(finding => normalizePolicy(finding.policy) === 'warned').map(finding => finding.target));
  return compatibilityTargets
   .filter(({ key }) => normalizePolicy(targets[key]?.policy) !== 'dismissed' && !warningTargets.has(key))
-  .map(({ label }) => label)
-  .join(', ');
+  .map(({ key }) => targetLetterBadges[key].toLowerCase())
+  .join('-');
 }
 
 function normalizeEmojiVersion(value: string | undefined): string | undefined {
